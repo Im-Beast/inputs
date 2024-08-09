@@ -189,6 +189,7 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
   if (buffer[1] === 79) {
     // If buffer has only three codepoints, then it has no modifiers.
     if (buffer.length === 3) {
+      if (buffer[2] === 77) return keyPress("return", true);
       const fKey = buffer[2] - 79;
       return keyPress(`f${fKey}`);
     }

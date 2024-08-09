@@ -1,5 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
-
+import { justFunc as oldDecodeBuffer } from "./input_reader/mod.ts";
 import { decodeBuffer, type KeyPress } from "../src/decode.ts";
 
 type ExpectedResult = [name: string, ansi: string, KeyPress];
@@ -89,7 +88,7 @@ function modifierTests(
   ];
 }
 
-const EXPECTED_RESULTS: ExpectedResult[] = [
+const BENCH_CASES: Uint8Array[] = ([
   // Alphabet
   ...Array.from({ length: 26 }, (_, i) => {
     const lowerCase = String.fromCharCode(97 + i);
@@ -175,18 +174,16 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ...modifierTests("CSI", "F10", "\x1b[21~", "f10"),
   ...modifierTests("CSI", "F11", "\x1b[23~", "f11"),
   ...modifierTests("CSI", "F12", "\x1b[24~", "f12"),
-];
+] as ExpectedResult[]).map((x) => new TextEncoder().encode(x[1]));
 
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
+Deno.bench("old", () => {
+  for (const buffer of BENCH_CASES) {
+    oldDecodeBuffer(buffer);
+  }
+});
 
-Deno.test("decodeBuffer()", async (t) => {
-  for (const [name, ansi, keyPress] of EXPECTED_RESULTS) {
-    await t.step(name, () => {
-      const ansiBuffer = textEncoder.encode(ansi);
-      const escaped = Deno.inspect(textDecoder.decode(ansiBuffer));
-
-      assertEquals(decodeBuffer(ansiBuffer), keyPress, escaped);
-    });
+Deno.bench("new", { baseline: true }, () => {
+  for (const buffer of BENCH_CASES) {
+    decodeBuffer(buffer);
   }
 });
