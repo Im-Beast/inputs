@@ -20,6 +20,7 @@ function modifierTests(
   baseAnsi: string,
   expectedKey: string,
   override: Partial<KeyPress> = {},
+  skipDefault = false,
 ): ExpectedResult[] {
   if (type === "Legacy") {
     const meta = "\x18@s";
@@ -49,8 +50,7 @@ function modifierTests(
   const alt = 2;
   const ctrl = 4;
 
-  return [
-    [`${name} (${type})`, baseAnsi, key(expectedKey, override)],
+  const rules: ExpectedResult[] = [
     [
       `Meta + ${name} (${type})`,
       insertModifier(baseAnsi, meta),
@@ -87,6 +87,12 @@ function modifierTests(
       key(expectedKey, { alt: true, ctrl: true, ...override }),
     ],
   ];
+
+  if (!skipDefault) {
+    rules.push([`${name} (${type})`, baseAnsi, key(expectedKey, override)]);
+  }
+
+  return rules;
 }
 
 const EXPECTED_RESULTS: ExpectedResult[] = [
@@ -158,16 +164,18 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ...modifierTests("CSI", "End", "\x1b[1;F", "end"),
 
   // Function keys
-  // F1..=F5
-  ...Array.from({ length: 5 }, (_, i) => {
+  // F1..=F4
+  ...Array.from({ length: 4 }, (_, i) => {
     const n = i + 1;
     const rules: ExpectedResult[] = [
       ...modifierTests("CSI", `F${n}`, `\x1b[1${n}~`, `f${n}`),
+      ...modifierTests("CSI", `F${n}`, `\x1b[1;${String.fromCharCode(80 + i)}`, `f${n}`, {}, true),
       ...modifierTests("SS3", `F${n}`, `\x1bO${String.fromCharCode(80 + i)}`, `f${n}`),
     ];
     return rules;
   }).flat(),
-  // F6..=F12
+  // F5..=F12
+  ...modifierTests("CSI", "F5", "\x1b[15~", "f5"),
   ...modifierTests("CSI", "F6", "\x1b[17~", "f6"),
   ...modifierTests("CSI", "F7", "\x1b[18~", "f7"),
   ...modifierTests("CSI", "F8", "\x1b[19~", "f8"),
