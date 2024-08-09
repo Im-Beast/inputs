@@ -76,9 +76,15 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
       case 0: return keyPress("space", false, true, meta, alt);
       // " "
       case 32: key = "space"; break;
-      // "\r", "\n"
-      case 13:
-      case 10: key = "return"; break;
+      // "\n"
+      //
+      // Ctrl+J is normally used to send NL/LF (same as Ctrl+I or Return).
+      // However instead of sending "\r" it sends "\n".
+      // This behavior seems to be followed by every major terminal.
+      // We use it then to distinguish it as "j" being pressed with at least ctrl
+      case 10: return keyPress("j", false, true, meta, alt);
+      // "\r"
+      case 13: key = "return"; break;
       // "\x1b"
       case 27: key = "escape"; break;
       // "\b", "\x7f"

@@ -102,7 +102,7 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
 
     // Excluded letters due to them being aliases to other common functionality
     const ctrlKey = String.fromCharCode(97 + i - 96);
-    if (!["h", "m", "j", "i"].includes(lowerCase)) {
+    if (!["h", "m", "i"].includes(lowerCase)) {
       rules.push(
         ...modifierTests("Legacy", lowerCase, lowerCase, lowerCase),
         ...modifierTests("Legacy", lowerCase, ctrlKey, lowerCase, {
@@ -117,10 +117,6 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
         case "m":
           rules.push([`Ctrl + ${lowerCase} -> Return`, ctrlKey, key("return")]);
           break;
-        // TODO: Same as with Ctrl+H, Ctrl+J = "\n", Return = "\r", have to check
-        // case "j":
-        //   rules.push([`Ctrl + ${lowerCase} -> Return`, ctrlKey, key("return")]);
-        //   break;
         case "i":
           rules.push([`Ctrl + ${lowerCase} -> Tab`, ctrlKey, key("tab")]);
           break;
@@ -137,10 +133,8 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
 
   // FIXME: Return uses the multiple prefix thing
   ["Return", "\r", key("return")],
-  ["Return (2)", "\n", key("return")],
   // FIXME: ["Shift + Return", "\x1bOM", key("return", { shift: true })],
   ["Alt + Return", "\x1b\r", key("return", { alt: true })],
-  ["Alt + Return (2)", "\x1b\n", key("return", { alt: true })],
 
   ["Escape", "\x1b", key("escape")],
   ["Alt + Escape", "\x1b\x1b", key("escape", { alt: true })],
