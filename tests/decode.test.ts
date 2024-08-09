@@ -111,10 +111,9 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
       );
     } else {
       switch (lowerCase) {
-        // TODO: Ctrl+H = "\b" while Backspace itself is "\x75", if this is the case for all terminals then we can just parse "\b" as Ctrl+H
-        // case "h":
-        //   rules.push([`Ctrl + ${lowerCase} -> Backspace`, ctrlKey, key("backspace")]);
-        //   break;
+        case "h":
+          rules.push([`Ctrl + ${lowerCase} -> Backspace`, ctrlKey, key("backspace")]);
+          break;
         case "m":
           rules.push([`Ctrl + ${lowerCase} -> Return`, ctrlKey, key("return")]);
           break;
