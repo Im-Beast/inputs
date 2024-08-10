@@ -11,6 +11,8 @@ export async function* decodeStdout() {
   }
 }
 
+const textDecoder = new TextDecoder();
+
 const enum Char {
   "NULL" = 0,
   "Backspace" = 8,
@@ -69,7 +71,7 @@ function keyPress(key: string, shift = false, ctrl = false, meta = false, alt = 
  * We also offset it by 1 (thus -49, not -48) to be able to bitmask it easily.
  */
 function modifierKeypress(key: string, modifiers: number): KeyPress {
-  modifiers -= 49;
+  modifiers -= Char["0n"] + 1;
   const meta = modifiers === 0;
   const shift = !!(modifiers & 1);
   const alt = !!(modifiers & 2);
@@ -83,7 +85,6 @@ function modifierKeypress(key: string, modifiers: number): KeyPress {
  */
 export function decodeBuffer(buffer: Uint8Array): KeyPress {
   // TODO: Handle cases where multiple inputs have been pressed at once
-  // TODO: Handle characters outside ASCII range
 
   // We start by checking keys that always start with "\x1b"
   // as it later allows us to always decode "\x1b" as a modifier key
@@ -180,36 +181,31 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
     }
   }
 
-  // All "normal" ASCII characters.
-  //
   // Legacy modifier encoding:
   //  - "\x1b" at the second last position signifies pressed alt.
   //  - "\x18@s" ast the start signifies pressed meta key.
-  //
-  // Character is always encoded at the last position.
-  if (buffer[0] < Char["DEL"]) {
-    // "\x1b"
-    const alt = buffer.length > 1 && (buffer[0] === Char["ESC"] || buffer[3] == Char["ESC"]);
-    // "\x18@s"
-    const meta = buffer[0] === Char["CANCEL"] && buffer[1] === Char["@"] && buffer[2] === Char["s"];
-    const charByte = buffer[(alt ? 1 : 0) + (meta ? 3 : 0)];
+  //  - Character is always encoded at the last position.
+  const alt = buffer.length > 1 && (buffer[0] === Char["ESC"] || buffer[3] == Char["ESC"]);
+  const meta = buffer[0] === Char["CANCEL"] && buffer[1] === Char["@"] && buffer[2] === Char["s"];
+  const startPos = (alt ? 1 : 0) + (meta ? 3 : 0);
+  const charByte = buffer[startPos];
 
-    // "!"..="@" | "["..="~"
-    if (
-      (charByte >= Char["!"] && charByte <= Char["@"]) ||
-      (charByte >= Char["["] && charByte <= Char["~"])
-    ) {
-      return keyPress(String.fromCharCode(charByte), false, false, meta, alt);
-    }
+  // "!"..="@" | "["..="~"
+  if (
+    (charByte >= Char["!"] && charByte <= Char["@"]) ||
+    (charByte >= Char["["] && charByte <= Char["~"])
+  ) {
+    return keyPress(String.fromCharCode(charByte), false, false, meta, alt);
+  }
 
-    // "A"..="Z"
-    if (charByte >= Char["A"] && charByte <= Char["Z"]) {
-      return keyPress(String.fromCharCode(charByte), true, false, meta, alt);
-    }
+  // "A"..="Z"
+  if (charByte >= Char["A"] && charByte <= Char["Z"]) {
+    return keyPress(String.fromCharCode(charByte), true, false, meta, alt);
+  }
 
-    let key = "unknown <4>";
-    // deno-fmt-ignore
-    switch (charByte) {
+  let key = "unknown <4>";
+  // deno-fmt-ignore
+  switch (charByte) {
       // "\x00"
       case Char["NULL"]: return keyPress("space", false, true, meta, alt);
       // " "
@@ -230,7 +226,6 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
       case Char["DEL"]: key = "backspace"; break;
       // "\t"
       case Char["Tab"]: key = "tab"; break;
-
       // ctrl + "a"..="z"
       //
       // When ctrl is held while typing any character between "a" to "z" its charcode is offset by 96.
@@ -238,15 +233,23 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
       //
       // See link above, section "Single-character functions" for more examples.
       default:
-        if (charByte >= (Char['a'] - 96)  && charByte <= (Char['z'] - 96)) {
+        if (charByte >= (Char["a"] - 96)  && charByte <= (Char["z"] - 96)) {
           return keyPress(String.fromCharCode(charByte + 96), false, true, meta, alt);
+        } else {
+          // Number of leading 1s in first byte tells us  how many codepoints the character contains
+          const codePoints =
+            (charByte & 0xf0) === 0xf0 ? 4 :
+            (charByte & 0xe0) === 0xe0 ? 3 :
+            (charByte & 0xc0) === 0xc0 ? 2 : 1;
+
+          const character = textDecoder.decode(buffer.slice(startPos, startPos + codePoints));
+          // We have to check whether it is lower case as well, since there are characters that dont have casings e.g. emojis
+          const shift = character.toUpperCase() === character && character.toLowerCase() !== character;
+          return keyPress(character, shift, false, meta, alt);
         }
     }
 
-    return keyPress(key, false, false, meta, alt);
-  }
-
-  return keyPress("unknown <end>");
+  return keyPress(key, false, false, meta, alt);
 }
 
 if (import.meta.main) {
