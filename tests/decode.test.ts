@@ -145,13 +145,13 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ["Alt + Escape", "\x1b\x1b", key("escape", { alt: true })],
 
   ["ArrowUp", "\x1b[A", key("up")],
-  ...modifierTests("CSI", "ArrowUp", "\x1b[1;A", "up"),
+  ...modifierTests("CSI", "ArrowUp", "\x1b[1;A", "up", {}, true),
   ["ArrowDown", "\x1b[B", key("down")],
-  ...modifierTests("CSI", "ArrowDown", "\x1b[1;B", "down"),
+  ...modifierTests("CSI", "ArrowDown", "\x1b[1;B", "down", {}, true),
   ["ArrowRight", "\x1b[C", key("right")],
-  ...modifierTests("CSI", "ArrowRight", "\x1b[1;C", "right"),
+  ...modifierTests("CSI", "ArrowRight", "\x1b[1;C", "right", {}, true),
   ["ArrowLeft", "\x1b[D", key("left")],
-  ...modifierTests("CSI", "ArrowLeft", "\x1b[1;D", "left"),
+  ...modifierTests("CSI", "ArrowLeft", "\x1b[1;D", "left", {}, true),
 
   // Other special keys
   ...modifierTests("CSI", "Insert", "\x1b[2~", "insert"),
@@ -159,9 +159,9 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ...modifierTests("CSI", "PageUp", "\x1b[5~", "pageup"),
   ...modifierTests("CSI", "PageDown", "\x1b[6~", "pagedown"),
   ["Home", "\x1b[H", key("home")],
-  ...modifierTests("CSI", "Home", "\x1b[1;H", "home"),
+  ...modifierTests("CSI", "Home", "\x1b[1;H", "home", {}, true),
   ["End", "\x1b[F", key("end")],
-  ...modifierTests("CSI", "End", "\x1b[1;F", "end"),
+  ...modifierTests("CSI", "End", "\x1b[1;F", "end", {}, true),
 
   // Function keys
   // F1..=F4
