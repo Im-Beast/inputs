@@ -44,24 +44,117 @@ function modifierKeypress(key: string, modifiers: number): KeyPress {
  */
 export function decodeBuffer(buffer: Uint8Array): KeyPress {
   // TODO: handle cases where multiple inputs have been pressed at once
+  // TODO: Rewrite hardcoded charpoints into const enum
 
-  const len = buffer.length;
+  // We start by checking keys that always start with "\x1b"
+  // as it later allows us to always decode "\x1b" as a modifier key
+  //
+  // Length check here is just a fast dismiss
+  if (buffer.length > 2 && buffer[0] === 27) {
+    // Insert | Delete | PageUp | PageDown | Home | End | Arrows | F1..=F12 (CSI prefix)
+    if (buffer[1] === 91) {
+      // F1..=F4
+      let fKey = buffer[6] - 79;
+      if (fKey > 0 && fKey < 5) {
+        return modifierKeypress(`f${fKey}`, buffer[5]);
+      }
+
+      // Home | End | Arrows
+      if (buffer[3] !== 126 && buffer[4] !== 126 && buffer[5] !== 126 && buffer[6] !== 126) {
+        let key = "unknown <1>";
+
+        // If fifth character is a semicolon (";") then it has encoded modifiers
+        const hasModifiers = buffer[4] === 59;
+
+        // deno-fmt-ignore
+        switch (buffer[hasModifiers ? 6 : 2]) {
+        case 65: key = "up"; break;
+        case 66: key = "down"; break;
+        case 67: key = "right"; break;
+        case 68: key = "left"; break;
+        case 70: key = "end"; break;
+        case 72: key = "home"; break;
+      }
+
+        if (hasModifiers) return modifierKeypress(key, buffer[5]);
+        return keyPress(key);
+      }
+
+      // Insert | Delete | PageUp | PageDown
+      // F5..=F12 as well as some other CSI encoded special keys end with tilde ("~")
+      if (buffer[3] === 126 || (buffer[3] == 59 && buffer[5] === 126)) {
+        let key = "unknown <2>";
+
+        // deno-fmt-ignore
+        switch (buffer[2]) {
+        case 50: key = "insert"; break;
+        case 51: key = "delete"; break;
+        case 53: key = "pageup"; break;
+        case 54: key = "pagedown"; break;
+      }
+
+        // If 4th character is a semicolon (";"), then it encodes modifiers
+        if (buffer[3] === 59) return modifierKeypress(key, buffer[4]);
+        return keyPress(key);
+      }
+
+      // Whoever designed this is a maniac?
+      // F5  – CSI 1 5 ~
+      // F6  – CSI 1 7 ~ <- ???
+      // F7  – CSI 1 8 ~
+      // F8  – CSI 1 9 ~
+      // F9  – CSI 2 0 ~
+      // F10 - CSI 2 1 ~
+      // F11 - CSI 2 3 ~ <- ???
+      // F12 - CSI 2 4 ~
+      if (buffer[2] === 49) {
+        fKey = buffer[3] - 48;
+        if (fKey > 5) fKey--;
+      } else {
+        // We are starting from 0 and its F9, so we add 9
+        fKey = buffer[3] - 39;
+        if (fKey > 10) fKey--;
+      }
+
+      // If 5th character is a semicolon (";"), then it encodes modifiers
+      if (buffer[4] === 59) return modifierKeypress(`f${fKey}`, buffer[5]);
+      return keyPress(`f${fKey}`);
+    }
+
+    // Shift + Return | F1..=F4 (SS3 prefix)
+    if (buffer[1] === 79) {
+      // Shift + Return produces this code for some reason
+      if (buffer[2] === 77) return keyPress("return", true);
+
+      // If F key is encoded at the third position
+      // then it has no modifiers
+      if (buffer[2] > 79) {
+        const fKey = buffer[2] - 79;
+        return keyPress(`f${fKey}`);
+      }
+
+      const fKey = buffer[3] - 79;
+      return modifierKeypress(`f${fKey}`, buffer[2]);
+    }
+  }
 
   // All "normal" ASCII characters.
   //
-  // "\0x1b" at the second last position signifies pressed alt.
-  // "\0x18" ast the start signifies pressed meta key.
+  // Legacy modifier encoding:
+  //  - "\x1b" at the second last position signifies pressed alt.
+  //  - "\x18@s" ast the start signifies pressed meta key.
   //
   // Character is always encoded at the last position.
-  if (len === 1 || (buffer[0] === 27 && len === 2) || buffer[0] === 24) {
-    const charByte = buffer[len - 1];
-    const alt = buffer[len - 2] === 27;
-    // Length has to be larger than 1 otherwise it would correspond to ctrl+x
-    const meta = len > 1 && buffer[0] === 24;
+  if (buffer[0] < 127) {
+    // "\x1b"
+    const alt = buffer.length > 1 && (buffer[0] === 27 || buffer[3] == 27);
+    // "\x18@s"
+    const meta = buffer[0] === 24 && buffer[1] === 64 && buffer[2] === 115;
+    const charByte = buffer[(alt ? 1 : 0) + (meta ? 3 : 0)];
 
     // "!"..="@" | "["..="~"
     if ((charByte > 32 && charByte < 65) || (charByte > 90 && charByte < 127)) {
-      return { key: String.fromCharCode(charByte), meta, alt, ctrl: false, shift: false };
+      return keyPress(String.fromCharCode(charByte), false, false, meta, alt);
     }
 
     // "A"..="Z"
@@ -69,7 +162,7 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
       return keyPress(String.fromCharCode(charByte), true, false, meta, alt);
     }
 
-    let key = "unknown <1>";
+    let key = "unknown <4>";
     // deno-fmt-ignore
     switch (charByte) {
       // "\x00"
@@ -106,96 +199,6 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
     }
 
     return keyPress(key, false, false, meta, alt);
-  }
-
-  // "\x1b"
-  if (buffer[0] !== 27) {
-    throw new Error(
-      "Something is not being handled:" + Deno.inspect(new TextDecoder().decode(buffer)),
-    );
-  }
-
-  // Insert | Delete | PageUp | PageDown | Home | End | Arrows | F1..=F12 (CSI prefix)
-  if (buffer[1] === 91) {
-    // F1..=F4
-    let fKey = buffer[len - 1] - 79;
-    if (fKey > 0 && fKey < 5) {
-      return modifierKeypress(`f${fKey}`, buffer[len - 2]);
-    }
-
-    // Home | End | Arrows
-    if (buffer[len - 1] !== 126) {
-      let key = "unknown <2>";
-
-      // deno-fmt-ignore
-      switch (buffer[len - 1]) {
-        case 65: key = "up"; break;
-        case 66: key = "down"; break;
-        case 67: key = "right"; break;
-        case 68: key = "left"; break;
-        case 70: key = "end"; break;
-        case 72: key = "home"; break;
-      }
-
-      // If buffer is smaller than 6 codepoints it has no modifiers.
-      if (len < 6) return keyPress(key);
-      return modifierKeypress(key, buffer[len - 2]);
-    }
-
-    // Insert | Delete | PageUp | PageDown
-    // Function key sequences only exist with buffer length
-    // of 5 and 7, so to check if its a special key instead
-    // we can use this intrinsic
-    if (len !== 5 && len !== 7) {
-      let key = "unknown <3>";
-
-      // deno-fmt-ignore
-      switch (buffer[2]) {
-        case 50: key = "insert"; break;
-        case 51: key = "delete"; break;
-        case 53: key = "pageup"; break;
-        case 54: key = "pagedown"; break;
-      }
-
-      // If buffer is smaller than 6 codepoints it has no modifiers.
-      if (len < 6) return keyPress(key);
-      return modifierKeypress(key, buffer[len - 2]);
-    }
-
-    // Whoever designed this is a maniac?
-    // F5  – CSI 1 5 ~
-    // F6  – CSI 1 7 ~ <- ???
-    // F7  – CSI 1 8 ~
-    // F8  – CSI 1 9 ~
-    // F9  – CSI 2 0 ~
-    // F10 - CSI 2 1 ~
-    // F11 - CSI 2 3 ~ <- ???
-    // F12 - CSI 2 4 ~
-    if (buffer[2] === 49) {
-      fKey = buffer[3] - 48;
-      if (fKey > 5) fKey--;
-    } else {
-      // We are starting from 0 and its F9, so we add 9
-      fKey = buffer[3] - 39;
-      if (fKey > 10) fKey--;
-    }
-
-    // If buffer has only five codepoints, then it has no modifiers.
-    if (len === 5) return keyPress(`f${fKey}`);
-    return modifierKeypress(`f${fKey}`, buffer[len - 2]);
-  }
-
-  // F1..=F4 (SS3 prefix)
-  if (buffer[1] === 79) {
-    // If buffer has only three codepoints, then it has no modifiers.
-    if (buffer.length === 3) {
-      if (buffer[2] === 77) return keyPress("return", true);
-      const fKey = buffer[2] - 79;
-      return keyPress(`f${fKey}`);
-    }
-
-    const fKey = buffer[3] - 79;
-    return modifierKeypress(`f${fKey}`, buffer[2]);
   }
 
   return keyPress("unknown <end>");
