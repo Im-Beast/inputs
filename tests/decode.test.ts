@@ -95,6 +95,7 @@ function modifierTests(
   return rules;
 }
 
+//  TODO: emojis and stuff
 const EXPECTED_RESULTS: ExpectedResult[] = [
   // Alphabet
   ...Array.from({ length: 26 }, (_, i) => {
@@ -145,13 +146,13 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ["Alt + Escape", "\x1b\x1b", key("escape", { alt: true })],
 
   ["ArrowUp", "\x1b[A", key("up")],
-  ...modifierTests("CSI", "ArrowUp", "\x1b[1;A", "up", {}, true),
+  ...modifierTests("CSI", "ArrowUp", "\x1b[1A", "up", {}, true),
   ["ArrowDown", "\x1b[B", key("down")],
-  ...modifierTests("CSI", "ArrowDown", "\x1b[1;B", "down", {}, true),
+  ...modifierTests("CSI", "ArrowDown", "\x1b[1B", "down", {}, true),
   ["ArrowRight", "\x1b[C", key("right")],
-  ...modifierTests("CSI", "ArrowRight", "\x1b[1;C", "right", {}, true),
+  ...modifierTests("CSI", "ArrowRight", "\x1b[1C", "right", {}, true),
   ["ArrowLeft", "\x1b[D", key("left")],
-  ...modifierTests("CSI", "ArrowLeft", "\x1b[1;D", "left", {}, true),
+  ...modifierTests("CSI", "ArrowLeft", "\x1b[1D", "left", {}, true),
 
   // Other special keys
   ...modifierTests("CSI", "Insert", "\x1b[2~", "insert"),
@@ -159,9 +160,9 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ...modifierTests("CSI", "PageUp", "\x1b[5~", "pageup"),
   ...modifierTests("CSI", "PageDown", "\x1b[6~", "pagedown"),
   ["Home", "\x1b[H", key("home")],
-  ...modifierTests("CSI", "Home", "\x1b[1;H", "home", {}, true),
+  ...modifierTests("CSI", "Home", "\x1b[1H", "home", {}, true),
   ["End", "\x1b[F", key("end")],
-  ...modifierTests("CSI", "End", "\x1b[1;F", "end", {}, true),
+  ...modifierTests("CSI", "End", "\x1b[1F", "end", {}, true),
 
   // Function keys
   // F1..=F4
@@ -169,7 +170,7 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
     const n = i + 1;
     const rules: ExpectedResult[] = [
       ...modifierTests("CSI", `F${n}`, `\x1b[1${n}~`, `f${n}`),
-      ...modifierTests("CSI", `F${n}`, `\x1b[1;${String.fromCharCode(80 + i)}`, `f${n}`, {}, true),
+      ...modifierTests("CSI", `F${n}`, `\x1b[1${String.fromCharCode(80 + i)}`, `f${n}`, {}, true),
       ...modifierTests("SS3", `F${n}`, `\x1bO${String.fromCharCode(80 + i)}`, `f${n}`),
     ];
     return rules;
