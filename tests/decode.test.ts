@@ -1,4 +1,5 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertArrayIncludes, assertEquals } from "jsr:@std/assert";
+import { permutations } from "jsr:@std/collections/permutations";
 
 import { decodeBuffer, type KeyPress } from "../src/decode.ts";
 
@@ -197,5 +198,37 @@ Deno.test("decodeBuffer()", async (t) => {
 
       assertEquals(decodeBuffer(ansiBuffer), keyPress, escaped);
     });
+  }
+});
+
+Deno.test("decodeBuffer() – 2 inputs at once", async (t) => {
+  const POSSIBLE_MULTIPLE = EXPECTED_RESULTS.filter((result) => {
+    // Escape key cannot be sent together with other keys
+    // Possibly to avoid mixing it with legacy modifier encoding
+    if (/Escape/.test(result[0])) return false;
+    return true;
+  });
+
+  for (let i = 0; i < POSSIBLE_MULTIPLE.length; ++i) {
+    const [nameA, ansiA, keyPressA] = POSSIBLE_MULTIPLE[i];
+    for (let j = 0; j < 4; ++j) {
+      const [nameB, ansiB, keyPressB] = POSSIBLE_MULTIPLE[(i + j) % POSSIBLE_MULTIPLE.length];
+      const expectedResult = [keyPressA, keyPressB];
+
+      await t.step(`"${nameA}" + "${nameB}"`, async (t) => {
+        const ansis = permutations([ansiA, ansiB]);
+
+        for (const permutation of ansis) {
+          const ansi = permutation.join("");
+
+          await t.step(Deno.inspect(ansi), () => {
+            const ansiBuffer = textEncoder.encode(ansi);
+            const escaped = Deno.inspect(textDecoder.decode(ansiBuffer));
+
+            assertArrayIncludes(decodeBuffer(ansiBuffer) as KeyPress[], expectedResult, escaped);
+          });
+        }
+      });
+    }
   }
 });
