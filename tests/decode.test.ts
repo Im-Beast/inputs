@@ -39,9 +39,7 @@ function modifierTests(
 
   const insertModifier = (string: string, modifier: number) => {
     const stringModifier = type === "CSI" ? `;${1 + modifier}` : `${1 + modifier}`;
-    return string.length > 1
-      ? string.replace(/(.+)(.)/, `$1${stringModifier}$2`)
-      : string + stringModifier;
+    return string.length > 1 ? string.replace(/(.+)(.)/, `$1${stringModifier}$2`) : string + stringModifier;
   };
 
   const meta = 0;
@@ -195,6 +193,7 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ["„", "„", key("„", { shift: false })],
   ["Family", "👪", key("👪")],
   ["Dog", "🐕", key("🐕")],
+  // TODO: Mouse tests
 ];
 
 const textEncoder = new TextEncoder();

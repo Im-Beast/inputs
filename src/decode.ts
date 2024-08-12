@@ -1,5 +1,10 @@
 export async function* decodeStdout() {
+  const ENABLE_MOUSE = "\x1b[?1000h"; //"\x1b[?9h\x1b[?1000h\x1b[?1002h\x1b[?1005h\x1b[?1006h\x1b[?1003h";
+  const DISABLE_MOUSE = "\x1b[1000l"; //"\x1b[?9l\x1b[?1000l\x1b[?1002l\x1b[?1005l\x1b[?1006l\x1b[?1003l";
+
   Deno.stdin.setRaw(true);
+  console.log(ENABLE_MOUSE);
+
   for await (const chunk of Deno.stdin.readable) {
     if (chunk[0] === 3) break;
 
@@ -9,6 +14,8 @@ export async function* decodeStdout() {
 
     yield decodeBuffer(chunk);
   }
+
+  console.log(DISABLE_MOUSE);
 }
 
 const textDecoder = new TextDecoder();
@@ -34,6 +41,7 @@ const enum Char {
   "7n" = 55,
   "8n" = 56,
   "9n" = 57,
+  "<" = 60,
   "@" = 64,
   "A" = 65,
   "B" = 66,
@@ -61,8 +69,35 @@ export interface KeyPress {
   alt: boolean;
 }
 
+export const enum MouseButton {
+  Left = 0,
+  Middle,
+  Right,
+}
+
+export const enum MouseScroll {
+  Up,
+  Down,
+}
+
+// TODO: Maybe it should be split into multiple interfaces, TBD
+export interface MousePress extends KeyPress {
+  key: "mouse";
+
+  button?: MouseButton;
+  release?: boolean;
+  scroll?: MouseScroll;
+
+  x: number;
+  y: number;
+}
+
 function keyPress(key: string, shift = false, ctrl = false, meta = false, alt = false): [KeyPress] {
-  return [{ key, meta, ctrl, shift, alt }];
+  return [{ key, shift, ctrl, meta, alt }];
+}
+
+function mousePress(x: number, y: number, other?: Partial<MousePress>): [MousePress] {
+  return [{ key: "mouse", x, y, shift: false, ctrl: false, meta: false, alt: false, ...other }];
 }
 
 function maybeMultiple(keyPress: [KeyPress], buffer: Uint8Array, length: number) {
@@ -98,6 +133,56 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
   if (buffer.length > 2 && buffer[0] === Char["ESC"]) {
     // Insert | Delete | PageUp | PageDown | Home | End | Arrows | F1..=F12 (CSI prefix)
     if (buffer[1] === Char["["]) {
+      // Mouse (X10 Compatibility mode and Normal tracking mode)
+      // Used when "\x1b[?9h" and "\x1b[?1000h"
+      // CSI M B X Y
+      if (buffer[2] === Char["M"]) {
+        // Normal tracking mode
+        if (buffer[3] > 32 + MouseButton.Right) {
+          let cb = buffer[3] - 32;
+
+          // Low two bits encode button (or 3 – release)
+          const button = cb & 3;
+          cb -= button;
+
+          // Then modifiers are stored in the next 3 bits, added together, not bitmasked
+          let modifiers = cb & 63;
+          cb -= cb & 32;
+          const ctrl = modifiers >= 16;
+          if (ctrl) modifiers -= 16;
+          // Technically meta, however most terminals decode it as an alt
+          const alt = modifiers >= 8;
+          if (alt) modifiers -= 8;
+          const shift = modifiers >= 4;
+          if (shift) modifiers -= 4;
+
+          // Release events aren't reported for the scroll
+          const scroll = cb >= 64 && button !== 3;
+          if (scroll) cb -= 64;
+
+          const x = buffer[4] - 32;
+          const y = buffer[5] - 32;
+
+          if (scroll) {
+            return maybeMultiple(
+              mousePress(x, y, { scroll: button, ctrl, alt, shift }),
+              buffer,
+              6,
+            );
+          }
+
+          return maybeMultiple(mousePress(x, y, { button, ctrl, alt, shift }), buffer, 6);
+        }
+
+        // X10 Compatibility mode
+        const button = buffer[3] - 32;
+        const x = buffer[4] - 32;
+        const y = buffer[5] - 32;
+        return mousePress(x, y, { button });
+      }
+
+      // TODO: Don't precalculate?
+      // F1..=F4
       let fKey = buffer[5] - Char["O"];
       if (fKey > 0 && fKey < 5) {
         return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[4]), buffer, 6);
