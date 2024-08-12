@@ -1,6 +1,4 @@
 import { assertArrayIncludes, assertEquals } from "jsr:@std/assert";
-import { permutations } from "jsr:@std/collections/permutations";
-
 import { decodeBuffer, type KeyPress } from "../src/decode.ts";
 
 type ExpectedResult = [name: string, ansi: string, KeyPress];
@@ -185,18 +183,30 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ...modifierTests("CSI", "F10", "\x1b[21~", "f10"),
   ...modifierTests("CSI", "F11", "\x1b[23~", "f11"),
   ...modifierTests("CSI", "F12", "\x1b[24~", "f12"),
+
+  // Non-ASCII characters
+  // TODO: add more
+  ["æ", "æ", key("æ")],
+  ["Æ", "Æ", key("Æ", { shift: true })],
+  ["ą", "ą", key("ą", { shift: false })],
+  ["Ą", "Ą", key("Ą", { shift: true })],
+  ["þ", "þ", key("þ", { shift: false })],
+  ["Þ", "Þ", key("Þ", { shift: true })],
+  ["„", "„", key("„", { shift: false })],
+  ["Family", "👪", key("👪")],
+  ["Dog", "🐕", key("🐕")],
 ];
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-Deno.test("decodeBuffer()", async (t) => {
+Deno.test("decodeBuffer() – 1 input", async (t) => {
   for (const [name, ansi, keyPress] of EXPECTED_RESULTS) {
     await t.step(name, () => {
       const ansiBuffer = textEncoder.encode(ansi);
       const escaped = Deno.inspect(textDecoder.decode(ansiBuffer));
 
-      assertEquals(decodeBuffer(ansiBuffer), keyPress, escaped);
+      assertEquals(decodeBuffer(ansiBuffer), [keyPress], escaped);
     });
   }
 });
@@ -216,11 +226,9 @@ Deno.test("decodeBuffer() – 2 inputs at once", async (t) => {
       const expectedResult = [keyPressA, keyPressB];
 
       await t.step(`"${nameA}" + "${nameB}"`, async (t) => {
-        const ansis = permutations([ansiA, ansiB]);
+        const permutations = [ansiA + ansiB, ansiB + ansiA];
 
-        for (const permutation of ansis) {
-          const ansi = permutation.join("");
-
+        for (const ansi of permutations) {
           await t.step(Deno.inspect(ansi), () => {
             const ansiBuffer = textEncoder.encode(ansi);
             const escaped = Deno.inspect(textDecoder.decode(ansiBuffer));
