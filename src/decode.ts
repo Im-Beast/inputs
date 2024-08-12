@@ -61,8 +61,13 @@ export interface KeyPress {
   alt: boolean;
 }
 
-function keyPress(key: string, shift = false, ctrl = false, meta = false, alt = false): KeyPress {
-  return { key, meta, ctrl, shift, alt };
+function keyPress(key: string, shift = false, ctrl = false, meta = false, alt = false): [KeyPress] {
+  return [{ key, meta, ctrl, shift, alt }];
+}
+
+function maybeMultiple(keyPress: [KeyPress], buffer: Uint8Array, length: number) {
+  if (buffer.length > length) keyPress.push(...decodeBuffer(buffer.slice(length)));
+  return keyPress;
 }
 
 /**
@@ -70,7 +75,7 @@ function keyPress(key: string, shift = false, ctrl = false, meta = false, alt = 
  * Modifiers byte is a char "1"..="9", so we convert it to a number first.
  * We also offset it by 1 (thus -49, not -48) to be able to bitmask it easily.
  */
-function modifierKeypress(key: string, modifiers: number): KeyPress {
+function modifierKeypress(key: string, modifiers: number): [KeyPress] {
   modifiers -= Char["0n"] + 1;
   const meta = modifiers === 0;
   const shift = !!(modifiers & 1);
@@ -83,8 +88,8 @@ function modifierKeypress(key: string, modifiers: number): KeyPress {
  * A lot of information has been taken from @link {https://invisible-island.net/xterm/ctlseqs/ctlseqs.txt}.\
  * I cannot be more thankful to the authors of this document ❤️.
  */
-export function decodeBuffer(buffer: Uint8Array): KeyPress {
-  // TODO: Handle cases where multiple inputs have been pressed at once
+export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
+  // TODO: Support kitty protocol
 
   // We start by checking keys that always start with "\x1b"
   // as it later allows us to always decode "\x1b" as a modifier key
@@ -93,33 +98,36 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
   if (buffer.length > 2 && buffer[0] === Char["ESC"]) {
     // Insert | Delete | PageUp | PageDown | Home | End | Arrows | F1..=F12 (CSI prefix)
     if (buffer[1] === Char["["]) {
-      // F1..=F4
-      let fKey = buffer[6] - Char["O"];
-      if (fKey > 0 && fKey < 5) return modifierKeypress(`f${fKey}`, buffer[5]);
+      let fKey = buffer[5] - Char["O"];
+      if (fKey > 0 && fKey < 5) {
+        return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[4]), buffer, 6);
+      }
 
       // Home | End | Arrows
       if (
-        buffer[3] !== Char["~"] && buffer[4] !== Char["~"] &&
-        buffer[5] !== Char["~"] && buffer[6] !== Char["~"]
+        buffer[1] === Char["["] && (
+          (buffer[2] >= Char["A"] && buffer[2] <= Char["H"]) ||
+          (buffer[3] === Char[";"] && buffer[5] >= Char["A"] && buffer[5] <= Char["H"])
+        )
       ) {
         let key = "unknown <1>";
 
-        // If fifth character is a semicolon (";") then it has encoded modifiers
-        const hasModifiers = buffer[4] === Char[";"];
+        // If fourth character is a semicolon (";") then it has encoded modifiers
+        const hasModifiers = buffer[3] === Char[";"];
 
         // deno-fmt-ignore
-        switch (buffer[hasModifiers ? 6 : 2]) {
-        case Char["A"]: key = "up"; break;
-        case Char["B"]: key = "down"; break;
-        case Char["C"]: key = "right"; break;
-        case Char["D"]: key = "left"; break;
+        switch (buffer[hasModifiers ? 5 : 2]) {
+          case Char["A"]: key = "up"; break;
+          case Char["B"]: key = "down"; break;
+          case Char["C"]: key = "right"; break;
+          case Char["D"]: key = "left"; break;
 
-        case Char["F"]: key = "end"; break;
-        case Char["H"]: key = "home"; break;
-      }
+          case Char["F"]: key = "end"; break;
+          case Char["H"]: key = "home"; break;
+        }
 
-        if (hasModifiers) return modifierKeypress(key, buffer[5]);
-        return keyPress(key);
+        if (hasModifiers) return maybeMultiple(modifierKeypress(key, buffer[4]), buffer, 6);
+        return maybeMultiple(keyPress(key), buffer, 3);
       }
 
       // Insert | Delete | PageUp | PageDown
@@ -137,8 +145,10 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
         }
 
         // If 4th character is a semicolon (";"), then it encodes modifiers
-        if (buffer[3] === Char[";"]) return modifierKeypress(key, buffer[4]);
-        return keyPress(key);
+        if (buffer[3] === Char[";"]) {
+          return maybeMultiple(modifierKeypress(key, buffer[4]), buffer, 6);
+        }
+        return maybeMultiple(keyPress(key), buffer, 4);
       }
 
       // Whoever designed this is a maniac?
@@ -160,24 +170,28 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
       }
 
       // If 5th character is a semicolon (";"), then it encodes modifiers
-      if (buffer[4] === Char[";"]) return modifierKeypress(`f${fKey}`, buffer[5]);
-      return keyPress(`f${fKey}`);
+      if (buffer[4] === Char[";"]) {
+        return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[5]), buffer, 7);
+      }
+      return maybeMultiple(keyPress(`f${fKey}`), buffer, 5);
     }
 
     // Shift + Return | F1..=F4 (SS3 prefix)
     if (buffer[1] === Char["O"]) {
       // Shift + Return produces this code for some reason
-      if (buffer[2] === Char["M"]) return keyPress("return", true);
+      if (buffer[2] === Char["M"]) {
+        return maybeMultiple(keyPress("return", true), buffer, 3);
+      }
 
       // If F key is encoded at the third position
       // then it has no modifiers
       if (buffer[2] > Char["O"]) {
         const fKey = buffer[2] - Char["O"];
-        return keyPress(`f${fKey}`);
+        return maybeMultiple(keyPress(`f${fKey}`), buffer, 3);
       }
 
       const fKey = buffer[3] - Char["O"];
-      return modifierKeypress(`f${fKey}`, buffer[2]);
+      return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[2]), buffer, 4);
     }
   }
 
@@ -195,61 +209,81 @@ export function decodeBuffer(buffer: Uint8Array): KeyPress {
     (charByte >= Char["!"] && charByte <= Char["@"]) ||
     (charByte >= Char["["] && charByte <= Char["~"])
   ) {
-    return keyPress(String.fromCharCode(charByte), false, false, meta, alt);
+    const character = String.fromCharCode(charByte);
+    return maybeMultiple(keyPress(character, false, false, meta, alt), buffer, startPos + 1);
   }
 
   // "A"..="Z"
   if (charByte >= Char["A"] && charByte <= Char["Z"]) {
-    return keyPress(String.fromCharCode(charByte), true, false, meta, alt);
+    const character = String.fromCharCode(charByte);
+    return maybeMultiple(keyPress(character, true, false, meta, alt), buffer, startPos + 1);
   }
 
   let key = "unknown <4>";
+  let ctrl = false;
+
   // deno-fmt-ignore
   switch (charByte) {
-      // "\x00"
-      case Char["NULL"]: return keyPress("space", false, true, meta, alt);
-      // " "
-      case Char["SPACE"]: key = "space"; break;
-      // "\n"
-      //
-      // Ctrl+J is normally used to send NL/LF (same as Ctrl+I or Return).
-      // However instead of sending "\r" it sends "\n".
-      // This behavior seems to be followed by every major terminal.
-      // We use it then to distinguish it as "j" being pressed with at least ctrl
-      case Char["LF"]: return keyPress("j", false, true, meta, alt);
-      // "\r"
-      case Char["CR"]: key = "return"; break;
-      // "\x1b"
-      case Char["ESC"]: key = "escape"; break;
-      // "\b", "\x7f"
-      case Char["Backspace"]:
-      case Char["DEL"]: key = "backspace"; break;
-      // "\t"
-      case Char["Tab"]: key = "tab"; break;
-      // ctrl + "a"..="z"
-      //
-      // When ctrl is held while typing any character between "a" to "z" its charcode is offset by 96.
-      // This means that some characters have exactly the same buffer, e.g. Ctrl+I = Tab, Ctrl+M = Return.
-      //
-      // See link above, section "Single-character functions" for more examples.
-      default:
-        if (charByte >= (Char["a"] - 96)  && charByte <= (Char["z"] - 96)) {
-          return keyPress(String.fromCharCode(charByte + 96), false, true, meta, alt);
-        } else {
-          // Number of leading 1s in first byte tells us  how many codepoints the character contains
-          const codePoints =
-            (charByte & 0xf0) === 0xf0 ? 4 :
-            (charByte & 0xe0) === 0xe0 ? 3 :
-            (charByte & 0xc0) === 0xc0 ? 2 : 1;
+    // "\x00"
+    case Char["NULL"]:
+      ctrl = true;
+      key = "space";
+      break;
+    // " "
+    case Char["SPACE"]: key = "space"; break;
+    // "\n"
+    //
+    // Ctrl+J is normally used to send NL/LF (same as Ctrl+I or Return).
+    // However instead of sending "\r" it sends "\n".
+    // This behavior seems to be followed by every major terminal.
+    // We use it then to distinguish it as "j" being pressed with at least ctrl
+    case Char["LF"]:
+      ctrl = true;
+      key = "j";
+      break;
+    // "\r"
+    case Char["CR"]: key = "return"; break;
+    // "\x1b"
+    case Char["ESC"]: key = "escape"; break;
+    // "\b", "\x7f"
+    case Char["Backspace"]:
+    case Char["DEL"]: key = "backspace"; break;
+    // "\t"
+    case Char["Tab"]: key = "tab"; break;
+    // ctrl + "a"..="z"
+    //
+    // When ctrl is held while typing any character between "a" to "z" its charcode is offset by 96.
+    // This means that some characters have exactly the same buffer, e.g. Ctrl+I = Tab, Ctrl+M = Return.
+    //
+    // See link above, section "Single-character functions" for more examples.
+    default:
+      if (charByte >= (Char["a"] - 96)  && charByte <= (Char["z"] - 96)) {
+        return maybeMultiple(keyPress(String.fromCharCode(charByte + 96), false, true, meta, alt), buffer, startPos + 1);
+      } else {
+        // Number of leading 1s in first byte tells us how many codepoints the character contains
+        // deno-fmt-ignore
+        const codePoints =
+          (charByte & 0xf0) === 0xf0 ? 4 :
+          (charByte & 0xe0) === 0xe0 ? 3 :
+          (charByte & 0xc0) === 0xc0 ? 2 : 1;
 
+        if (buffer.length > startPos + codePoints) {
           const character = textDecoder.decode(buffer.slice(startPos, startPos + codePoints));
           // We have to check whether it is lower case as well, since there are characters that dont have casings e.g. emojis
           const shift = character.toUpperCase() === character && character.toLowerCase() !== character;
-          return keyPress(character, shift, false, meta, alt);
-        }
-    }
 
-  return keyPress(key, false, false, meta, alt);
+          const kp = keyPress(character, shift, false, meta, alt);
+          kp.push(...decodeBuffer(buffer.slice(startPos + codePoints)));
+          return kp
+        }
+
+        const character = textDecoder.decode(buffer);
+        const shift = character.toUpperCase() === character && character.toLowerCase() !== character;
+        return keyPress(character, shift, false, meta, alt);
+      }
+  }
+
+  return maybeMultiple(keyPress(key, false, ctrl, meta, alt), buffer, startPos + 1);
 }
 
 if (import.meta.main) {
