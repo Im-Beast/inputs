@@ -121,6 +121,19 @@ function modifierKeypress(key: string, modifiers: number): [KeyPress] {
 }
 
 /**
+ * Converts a pair of UTF-8 code points into UTF-16 code unit
+ * @example
+ * `"Ą" = [ 196, 132 ] = [ 11000100, 10000100 ] -> 00100000100 = 260`
+ */
+function utf8CodePointsToUtf16CodeUnit(a: number, b: number): number {
+  if ((a & 0xE0) == 0xC0 && (b & 0xC0) == 0x80) {
+    return ((a & 0x1F) << 6) | (b & 0x3F);
+  } else {
+    throw new Error("Could not convert UTF8 code point pair into a UTF16 code unit");
+  }
+}
+
+/**
  * A lot of information has been taken from @link {https://invisible-island.net/xterm/ctlseqs/ctlseqs.txt}.\
  * I cannot be more thankful to the authors of this document ❤️.
  */
@@ -163,8 +176,16 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
           const scroll = !!(cb & 64) && button !== 3;
           // TODO: Buttons through 6 to 11?
 
-          const x = buffer[4] - 32;
-          const y = buffer[5] - 32;
+          // UTF-8 Extended coordinates ("\x1b[?1005h")
+          // For positions less than 95, the resulting output is identical to X10
+          const x = (
+            buffer[4] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]) : buffer[4]
+          ) - 32;
+          const y = (
+            buffer[4] > 128
+              ? (buffer[6] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[6], buffer[7]) : buffer[6])
+              : (buffer[5] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[5], buffer[6]) : buffer[5])
+          ) - 32;
 
           let mousePressData: Partial<MousePress>;
           // Drag & Release is enabled when Any-event tracking mode is enabled
@@ -184,8 +205,18 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
         // X10 Compatibility mode ("\x1b[?9h")
         // CSI M B X Y
         const button = buffer[3] - 32;
-        const x = buffer[4] - 32;
-        const y = buffer[5] - 32;
+
+        // UTF-8 Extended coordinates ("\x1b[?1005h")
+        // For positions less than 95, the resulting output is identical to X10
+        const x = (
+          buffer[4] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]) : buffer[4]
+        ) - 32;
+        const y = (
+          buffer[4] > 128
+            ? (buffer[6] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[6], buffer[7]) : buffer[6])
+            : (buffer[5] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[5], buffer[6]) : buffer[5])
+        ) - 32;
+
         return mousePress(x, y, { button });
       }
 
