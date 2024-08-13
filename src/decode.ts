@@ -49,11 +49,13 @@ const enum Char {
   "D" = 68,
   "F" = 70,
   "H" = 72,
+  "I" = 73,
   "M" = 77,
   "O" = 79,
   "Z" = 90,
   "[" = 91,
   "a" = 97,
+  "m" = 109,
   "s" = 115,
   "z" = 122,
   "~" = 126,
@@ -121,6 +123,41 @@ function modifierKeypress(key: string, modifiers: number): [KeyPress] {
 }
 
 /**
+ * Returns calculated mouse X10 modifiers
+ */
+function mouseX10Modifiers(encodedButton: number): Partial<MousePress> {
+  // Low two bits encode button (or 3 – release)
+  const button = encodedButton & 3;
+
+  // Then modifiers are stored in the next 3 bits
+  // We offset them by 2 bit places so they can be easily bitmasked
+  const modifiers = (encodedButton & 31) >> 2;
+  const ctrl = !!(modifiers & 4);
+  // Technically meta, however most terminals decode it as an alt
+  const alt = !!(modifiers & 2);
+  const shift = !!(modifiers & 1);
+
+  // Used with button-event and any-event tracking modes
+  const drag = !!(encodedButton & 32);
+
+  // Release events aren't reported for the scroll
+  const scroll = !!(encodedButton & 64) && button !== 3;
+  // TODO: Buttons through 6 to 11?
+
+  // Drag & Release is enabled when Any-event tracking mode is enabled
+  // And user just moves their mouse
+  if (drag && button === 3) {
+    return { ctrl, alt, shift };
+  } else if (scroll) {
+    return { scroll: button, drag, ctrl, alt, shift };
+  } else if (button === 3) {
+    return { release: true, drag, ctrl, alt, shift };
+  } else {
+    return { button, drag, ctrl, alt, shift };
+  }
+}
+
+/**
  * Converts a pair of UTF-8 code points into UTF-16 code unit
  * @example
  * `"Ą" = [ 196, 132 ] = [ 11000100, 10000100 ] -> 00100000100 = 260`
@@ -146,33 +183,40 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
   if (buffer.length > 2 && buffer[0] === Char["ESC"]) {
     // Mouse | Insert | Delete | PageUp | PageDown | Home | End | Arrows | F1..=F12 (CSI prefix)
     if (buffer[1] === Char["["]) {
-      // Mouse
+      // Mouse (SGR, "\x1b[?1006h")
+      if (buffer[2] === Char["<"]) {
+        // CSI < B ; X ; Y (M/m)
+        const numbers = [0, 0, 0];
+        let i = 3, j = 0;
+        for (; i < buffer.length; ++i) {
+          const char = buffer[i];
+          if (char === Char[";"]) {
+            ++j;
+            continue;
+          } else if (char === Char["m"] || char === Char["M"]) {
+            break;
+          }
+
+          // Decode numbers
+          numbers[j] *= 10;
+          numbers[j] += char - Char["0n"];
+        }
+
+        const [encodedButton, x, y] = numbers;
+        const modifiers = mouseX10Modifiers(encodedButton);
+        modifiers.release ||= buffer[i] === Char["m"];
+        return mousePress(x, y, modifiers);
+      }
+
       // TODO: Mouse highlight tracking?
+      // Mouse
       if (buffer[2] === Char["M"]) {
         // Normal tracking mode ("\x1b[?1000h")
         // Button-event tracking ("\x1b[?1002h")
         // Any-event tracking ("\x1b[?1003h")
         // CSI M B X Y
         if (buffer[3] > 32 + MouseButton.Right) {
-          const cb = buffer[3] - 32;
-
-          // Low two bits encode button (or 3 – release)
-          const button = cb & 3;
-
-          // Then modifiers are stored in the next 3 bits
-          // We offset them by 2 bit places so they can be easily bitmasked
-          const modifiers = (cb & 31) >> 2;
-          const ctrl = !!(modifiers & 4);
-          // Technically meta, however most terminals decode it as an alt
-          const alt = !!(modifiers & 2);
-          const shift = !!(modifiers & 1);
-
-          // Used with button-event and any-event tracking modes
-          const drag = !!(cb & 32);
-
-          // Release events aren't reported for the scroll
-          const scroll = !!(cb & 64) && button !== 3;
-          // TODO: Buttons through 6 to 11?
+          const encodedButton = buffer[3];
 
           // UTF-8 Extended coordinates ("\x1b[?1005h")
           // For positions less than 95, the resulting output is identical to X10
@@ -185,19 +229,7 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
             y += buffer[5] > Char["DEL"] ? utf8CodePointsToUtf16CodeUnit(buffer[5], buffer[6]) ?? buffer[5] : buffer[5];
           }
 
-          let mousePressData: Partial<MousePress>;
-          // Drag & Release is enabled when Any-event tracking mode is enabled
-          // And user just moves their mouse
-          if (drag && button === 3) {
-            mousePressData = { ctrl, alt, shift };
-          } else if (scroll) {
-            mousePressData = { scroll: button, drag, ctrl, alt, shift };
-          } else if (button === 3) {
-            mousePressData = { release: true, drag, ctrl, alt, shift };
-          } else {
-            mousePressData = { button, drag, ctrl, alt, shift };
-          }
-          return maybeMultiple(mousePress(x, y, mousePressData), buffer, 6);
+          return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, 6);
         }
 
         // X10 Compatibility mode ("\x1b[?9h")
