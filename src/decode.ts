@@ -1,6 +1,6 @@
 export async function* decodeStdout() {
-  const ENABLE_MOUSE = "\x1b[?1000h"; //"\x1b[?9h\x1b[?1000h\x1b[?1002h\x1b[?1005h\x1b[?1006h\x1b[?1003h";
-  const DISABLE_MOUSE = "\x1b[1000l"; //"\x1b[?9l\x1b[?1000l\x1b[?1002l\x1b[?1005l\x1b[?1006l\x1b[?1003l";
+  const ENABLE_MOUSE = "\x1b[?1002h"; //"\x1b[?9h\x1b[?1000h\x1b[?1002h\x1b[?1005h\x1b[?1006h\x1b[?1003h";
+  const DISABLE_MOUSE = "\x1b[1002l"; //"\x1b[?9l\x1b[?1000l\x1b[?1002l\x1b[?1005l\x1b[?1006l\x1b[?1003l";
 
   Deno.stdin.setRaw(true);
   console.log(ENABLE_MOUSE);
@@ -87,6 +87,7 @@ export interface MousePress extends KeyPress {
   button?: MouseButton;
   release?: boolean;
   scroll?: MouseScroll;
+  drag: boolean;
 
   x: number;
   y: number;
@@ -97,7 +98,7 @@ function keyPress(key: string, shift = false, ctrl = false, meta = false, alt = 
 }
 
 function mousePress(x: number, y: number, other?: Partial<MousePress>): [MousePress] {
-  return [{ key: "mouse", x, y, shift: false, ctrl: false, meta: false, alt: false, ...other }];
+  return [{ key: "mouse", x, y, shift: false, drag: false, ctrl: false, meta: false, alt: false, ...other }];
 }
 
 function maybeMultiple(keyPress: [KeyPress], buffer: Uint8Array, length: number) {
@@ -133,38 +134,40 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
   if (buffer.length > 2 && buffer[0] === Char["ESC"]) {
     // Insert | Delete | PageUp | PageDown | Home | End | Arrows | F1..=F12 (CSI prefix)
     if (buffer[1] === Char["["]) {
-      // Mouse (X10 Compatibility mode and Normal tracking mode)
-      // Used when "\x1b[?9h" and "\x1b[?1000h"
-      // CSI M B X Y
+      // Mouse
+      // TODO: Mouse highlight tracking?
       if (buffer[2] === Char["M"]) {
-        // Normal tracking mode
+        // Button-event tracking ("\x1b[?1002h")
+        // Normal tracking mode ("\x1b[?1000h")
+        // CSI M B X Y
         if (buffer[3] > 32 + MouseButton.Right) {
-          let cb = buffer[3] - 32;
+          const cb = buffer[3] - 32;
 
           // Low two bits encode button (or 3 – release)
           const button = cb & 3;
-          cb -= button;
 
           // Then modifiers are stored in the next 3 bits
           // We offset them by 2 bit places so they can be easily bitmasked
           const modifiers = (cb & 31) >> 2;
-          cb -= modifiers;
           const ctrl = !!(modifiers & 4);
           // Technically meta, however most terminals decode it as an alt
           const alt = !!(modifiers & 2);
           const shift = !!(modifiers & 1);
 
+          const drag = !!(cb & 32);
+
           // Release events aren't reported for the scroll
-          const scroll = cb >= 64 && button !== 3;
-          if (scroll) cb -= 64;
+          const scroll = !!(cb & 64) && button !== 3;
           // TODO: Buttons through 6 to 11?
 
           const x = buffer[4] - 32;
           const y = buffer[5] - 32;
 
-          if (scroll) return maybeMultiple(mousePress(x, y, { scroll: button, ctrl, alt, shift }), buffer, 6);
-          if (button === 3) return maybeMultiple(mousePress(x, y, { release: true, ctrl, alt, shift }), buffer, 6);
-          return maybeMultiple(mousePress(x, y, { button, ctrl, alt, shift }), buffer, 6);
+          if (scroll) return maybeMultiple(mousePress(x, y, { scroll: button, drag, ctrl, alt, shift }), buffer, 6);
+          if (button === 3) {
+            return maybeMultiple(mousePress(x, y, { release: true, drag, ctrl, alt, shift }), buffer, 6);
+          }
+          return maybeMultiple(mousePress(x, y, { button, drag, ctrl, alt, shift }), buffer, 6);
         }
 
         // X10 Compatibility mode ("\x1b[?9h")
@@ -336,7 +339,7 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
     //
     // See link above, section "Single-character functions" for more examples.
     default:
-      if (charByte >= (Char["a"] - 96)  && charByte <= (Char["z"] - 96)) {
+      if (charByte >= (Char["a"] - 96) && charByte <= (Char["z"] - 96)) {
         return maybeMultiple(keyPress(String.fromCharCode(charByte + 96), false, true, meta, alt), buffer, startPos + 1);
       } else {
         // Number of leading 1s in first byte tells us how many codepoints the character contains
