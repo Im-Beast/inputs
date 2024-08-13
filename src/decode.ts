@@ -146,8 +146,8 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
           cb -= button;
 
           // Then modifiers are stored in the next 3 bits, added together, not bitmasked
-          let modifiers = cb & 63;
-          cb -= cb & 32;
+          let modifiers = cb & 31;
+          cb -= cb & 31;
           const ctrl = modifiers >= 16;
           if (ctrl) modifiers -= 16;
           // Technically meta, however most terminals decode it as an alt
@@ -159,22 +159,24 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
           // Release events aren't reported for the scroll
           const scroll = cb >= 64 && button !== 3;
           if (scroll) cb -= 64;
+          // TODO: Buttons through 6 to 11?
 
           const x = buffer[4] - 32;
           const y = buffer[5] - 32;
 
           if (scroll) {
-            return maybeMultiple(
-              mousePress(x, y, { scroll: button, ctrl, alt, shift }),
-              buffer,
-              6,
-            );
+            return maybeMultiple(mousePress(x, y, { scroll: button, ctrl, alt, shift }), buffer, 6);
+          }
+
+          if (button === 3) {
+            return maybeMultiple(mousePress(x, y, { release: true, ctrl, alt, shift }), buffer, 6);
           }
 
           return maybeMultiple(mousePress(x, y, { button, ctrl, alt, shift }), buffer, 6);
         }
 
-        // X10 Compatibility mode
+        // X10 Compatibility mode ("\x1b[?9h")
+        // CSI M B X Y
         const button = buffer[3] - 32;
         const x = buffer[4] - 32;
         const y = buffer[5] - 32;
