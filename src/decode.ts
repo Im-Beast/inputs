@@ -126,19 +126,21 @@ function modifierKeypress(key: string, modifiers: number): [KeyPress] {
  */
 export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
   // TODO: Support kitty protocol
+  // TODO: Support glueing together cut buffers (mostly windows mouse issue)
 
   // We start by checking keys that always start with "\x1b"
   // as it later allows us to always decode "\x1b" as a modifier key
   //
   // Length check here is just a fast dismiss
   if (buffer.length > 2 && buffer[0] === Char["ESC"]) {
-    // Insert | Delete | PageUp | PageDown | Home | End | Arrows | F1..=F12 (CSI prefix)
+    // Mouse | Insert | Delete | PageUp | PageDown | Home | End | Arrows | F1..=F12 (CSI prefix)
     if (buffer[1] === Char["["]) {
       // Mouse
       // TODO: Mouse highlight tracking?
       if (buffer[2] === Char["M"]) {
-        // Button-event tracking ("\x1b[?1002h")
         // Normal tracking mode ("\x1b[?1000h")
+        // Button-event tracking ("\x1b[?1002h")
+        // Any-event tracking ("\x1b[?1003h")
         // CSI M B X Y
         if (buffer[3] > 32 + MouseButton.Right) {
           const cb = buffer[3] - 32;
@@ -154,6 +156,7 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
           const alt = !!(modifiers & 2);
           const shift = !!(modifiers & 1);
 
+          // Used with button-event and any-event tracking modes
           const drag = !!(cb & 32);
 
           // Release events aren't reported for the scroll
@@ -163,11 +166,19 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
           const x = buffer[4] - 32;
           const y = buffer[5] - 32;
 
-          if (scroll) return maybeMultiple(mousePress(x, y, { scroll: button, drag, ctrl, alt, shift }), buffer, 6);
-          if (button === 3) {
-            return maybeMultiple(mousePress(x, y, { release: true, drag, ctrl, alt, shift }), buffer, 6);
+          let mousePressData: Partial<MousePress>;
+          // Drag & Release is enabled when Any-event tracking mode is enabled
+          // And user just moves their mouse
+          if (drag && button === 3) {
+            mousePressData = { ctrl, alt, shift };
+          } else if (scroll) {
+            mousePressData = { scroll: button, drag, ctrl, alt, shift };
+          } else if (button === 3) {
+            mousePressData = { release: true, drag, ctrl, alt, shift };
+          } else {
+            mousePressData = { button, drag, ctrl, alt, shift };
           }
-          return maybeMultiple(mousePress(x, y, { button, drag, ctrl, alt, shift }), buffer, 6);
+          return maybeMultiple(mousePress(x, y, mousePressData), buffer, 6);
         }
 
         // X10 Compatibility mode ("\x1b[?9h")
