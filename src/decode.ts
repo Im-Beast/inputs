@@ -145,16 +145,14 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
           const button = cb & 3;
           cb -= button;
 
-          // Then modifiers are stored in the next 3 bits, added together, not bitmasked
-          let modifiers = cb & 31;
-          cb -= cb & 31;
-          const ctrl = modifiers >= 16;
-          if (ctrl) modifiers -= 16;
+          // Then modifiers are stored in the next 3 bits
+          // We offset them by 2 bit places so they can be easily bitmasked
+          const modifiers = (cb & 31) >> 2;
+          cb -= modifiers;
+          const ctrl = !!(modifiers & 4);
           // Technically meta, however most terminals decode it as an alt
-          const alt = modifiers >= 8;
-          if (alt) modifiers -= 8;
-          const shift = modifiers >= 4;
-          if (shift) modifiers -= 4;
+          const alt = !!(modifiers & 2);
+          const shift = !!(modifiers & 1);
 
           // Release events aren't reported for the scroll
           const scroll = cb >= 64 && button !== 3;
@@ -164,14 +162,8 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
           const x = buffer[4] - 32;
           const y = buffer[5] - 32;
 
-          if (scroll) {
-            return maybeMultiple(mousePress(x, y, { scroll: button, ctrl, alt, shift }), buffer, 6);
-          }
-
-          if (button === 3) {
-            return maybeMultiple(mousePress(x, y, { release: true, ctrl, alt, shift }), buffer, 6);
-          }
-
+          if (scroll) return maybeMultiple(mousePress(x, y, { scroll: button, ctrl, alt, shift }), buffer, 6);
+          if (button === 3) return maybeMultiple(mousePress(x, y, { release: true, ctrl, alt, shift }), buffer, 6);
           return maybeMultiple(mousePress(x, y, { button, ctrl, alt, shift }), buffer, 6);
         }
 
