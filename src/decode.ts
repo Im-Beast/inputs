@@ -211,27 +211,6 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
       // TODO: Mouse highlight tracking?
       // Mouse
       if (buffer[2] === Char["M"]) {
-        // Normal tracking mode ("\x1b[?1000h")
-        // Button-event tracking ("\x1b[?1002h")
-        // Any-event tracking ("\x1b[?1003h")
-        // CSI M B X Y
-        if (buffer[3] > 32 + MouseButton.Right) {
-          const encodedButton = buffer[3];
-
-          // UTF-8 Extended coordinates ("\x1b[?1005h")
-          // For positions less than 95, the resulting output is identical to X10
-          let x = -32, y = -32;
-          if (buffer[4] > Char["DEL"]) {
-            x += utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]) ?? buffer[4];
-            y += buffer[6] > Char["DEL"] ? utf8CodePointsToUtf16CodeUnit(buffer[6], buffer[7]) ?? buffer[6] : buffer[5];
-          } else {
-            x += buffer[4];
-            y += buffer[5] > Char["DEL"] ? utf8CodePointsToUtf16CodeUnit(buffer[5], buffer[6]) ?? buffer[5] : buffer[5];
-          }
-
-          return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, 6);
-        }
-
         // X10 Compatibility mode ("\x1b[?9h")
         // CSI M B X Y
         const button = buffer[3] - 32;
@@ -246,6 +225,16 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
           x += buffer[4];
           y += buffer[5] > Char["DEL"] ? utf8CodePointsToUtf16CodeUnit(buffer[5], buffer[6]) ?? buffer[5] : buffer[5];
         }
+
+        // Normal tracking mode ("\x1b[?1000h")
+        // Button-event tracking ("\x1b[?1002h")
+        // Any-event tracking ("\x1b[?1003h")
+        // CSI M B X Y
+        if (button > MouseButton.Right) {
+          const encodedButton = buffer[3];
+          return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, 6);
+        }
+
         return mousePress(x, y, { button });
       }
 
