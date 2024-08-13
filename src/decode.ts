@@ -125,11 +125,9 @@ function modifierKeypress(key: string, modifiers: number): [KeyPress] {
  * @example
  * `"Ą" = [ 196, 132 ] = [ 11000100, 10000100 ] -> 00100000100 = 260`
  */
-function utf8CodePointsToUtf16CodeUnit(a: number, b: number): number {
+function utf8CodePointsToUtf16CodeUnit(a: number, b: number): number | undefined {
   if ((a & 0xE0) == 0xC0 && (b & 0xC0) == 0x80) {
     return ((a & 0x1F) << 6) | (b & 0x3F);
-  } else {
-    throw new Error("Could not convert UTF8 code point pair into a UTF16 code unit");
   }
 }
 
@@ -178,14 +176,14 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
 
           // UTF-8 Extended coordinates ("\x1b[?1005h")
           // For positions less than 95, the resulting output is identical to X10
-          const x = (
-            buffer[4] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]) : buffer[4]
-          ) - 32;
-          const y = (
-            buffer[4] > 128
-              ? (buffer[6] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[6], buffer[7]) : buffer[6])
-              : (buffer[5] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[5], buffer[6]) : buffer[5])
-          ) - 32;
+          let x = -32, y = -32;
+          if (buffer[4] > Char["DEL"]) {
+            x += utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]) ?? buffer[4];
+            y += buffer[6] > Char["DEL"] ? utf8CodePointsToUtf16CodeUnit(buffer[6], buffer[7]) ?? buffer[6] : buffer[5];
+          } else {
+            x += buffer[4];
+            y += buffer[5] > Char["DEL"] ? utf8CodePointsToUtf16CodeUnit(buffer[5], buffer[6]) ?? buffer[5] : buffer[5];
+          }
 
           let mousePressData: Partial<MousePress>;
           // Drag & Release is enabled when Any-event tracking mode is enabled
@@ -208,15 +206,14 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
 
         // UTF-8 Extended coordinates ("\x1b[?1005h")
         // For positions less than 95, the resulting output is identical to X10
-        const x = (
-          buffer[4] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]) : buffer[4]
-        ) - 32;
-        const y = (
-          buffer[4] > 128
-            ? (buffer[6] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[6], buffer[7]) : buffer[6])
-            : (buffer[5] > 128 ? utf8CodePointsToUtf16CodeUnit(buffer[5], buffer[6]) : buffer[5])
-        ) - 32;
-
+        let x = -32, y = -32;
+        if (buffer[4] > Char["DEL"]) {
+          x += utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]) ?? buffer[4];
+          y += buffer[6] > Char["DEL"] ? utf8CodePointsToUtf16CodeUnit(buffer[6], buffer[7]) ?? buffer[6] : buffer[5];
+        } else {
+          x += buffer[4];
+          y += buffer[5] > Char["DEL"] ? utf8CodePointsToUtf16CodeUnit(buffer[5], buffer[6]) ?? buffer[5] : buffer[5];
+        }
         return mousePress(x, y, { button });
       }
 
