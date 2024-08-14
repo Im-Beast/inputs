@@ -198,6 +198,7 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
     if (buffer[1] === Char["["]) {
       // Mouse (SGR, "\x1b[?1006h")
       if (buffer[2] === Char["<"]) {
+        // B, X and Y are encoded numbers
         // CSI < B ; X ; Y (M/m)
         const numbers = [0, 0, 0];
         let i = 3, j = 0;
@@ -221,8 +222,33 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
         return mousePress(x, y, modifiers);
       }
 
+      // Mouse (URXVT, "\x1b[?1015h")
+      if (buffer[2] >= Char["1n"] && buffer[2] <= Char["9n"]) {
+        // B, X and Y are encoded numbers
+        // CSI B ; X ; Y M
+        const numbers = [0, 0, 0];
+        let i = 2, j = 0;
+        for (; i < buffer.length; ++i) {
+          const char = buffer[i];
+          if (char === Char[";"]) {
+            ++j;
+            continue;
+          } else if (char === Char["M"]) {
+            break;
+          }
+
+          // Decode numbers
+          numbers[j] *= 10;
+          numbers[j] += char - Char["0n"];
+        }
+
+        // This encoding doesn't even support modifiers
+        const [encodedButton, x, y] = numbers;
+        return mousePress(x, y, mouseX10Modifiers(encodedButton));
+      }
+
       // TODO: Mouse highlight tracking?
-      // Mouse
+      // Mouse (X10, "\x1b[?9h")
       if (buffer[2] === Char["M"]) {
         // X10 Compatibility mode ("\x1b[?9h")
         // CSI M B X Y
