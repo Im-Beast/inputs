@@ -1,18 +1,19 @@
 export async function* decodeStdout() {
-  const ENABLE_MOUSE = "\x1b[?1002h"; //"\x1b[?9h\x1b[?1000h\x1b[?1002h\x1b[?1005h\x1b[?1006h\x1b[?1003h";
-  const DISABLE_MOUSE = "\x1b[1002l"; //"\x1b[?9l\x1b[?1000l\x1b[?1002l\x1b[?1005l\x1b[?1006l\x1b[?1003l";
+  const ENABLE_MOUSE = "\x1b[>1u\x1b[?1005h\x1b[?1015h\x1b[?1002h\x1b[?9h"; //"\x1b[?9h\x1b[?1000h\x1b[?1002h\x1b[?1005h\x1b[?1006h\x1b[?1003h";
+  const DISABLE_MOUSE = "\x1b[<1u\x1b[?1005l\x1b[?1015l\x1b[?1002l\x1b[?9l"; //"\x1b[?9l\x1b[?1000l\x1b[?1002l\x1b[?1005l\x1b[?1006l\x1b[?1003l";
 
   Deno.stdin.setRaw(true);
   console.log(ENABLE_MOUSE);
 
   for await (const chunk of Deno.stdin.readable) {
-    if (chunk[0] === 3) break;
-
     console.log(Deno.inspect(chunk, { breakLength: 99999, colors: true, compact: true }), [
       new TextDecoder().decode(chunk),
     ]);
 
-    yield decodeBuffer(chunk);
+    const decoded = decodeBuffer(chunk);
+    if (decoded[0].key === "c" && decoded[0].ctrl) break;
+
+    yield decoded;
   }
 
   console.log(DISABLE_MOUSE);
@@ -57,6 +58,7 @@ const enum Char {
   "a" = 97,
   "m" = 109,
   "s" = 115,
+  "u" = 117,
   "z" = 122,
   "~" = 126,
   "DEL" = 127,
@@ -222,31 +224,68 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
         return mousePress(x, y, modifiers);
       }
 
-      // Mouse (URXVT, "\x1b[?1015h")
-      mouse: if (buffer[2] >= Char["1n"] && buffer[2] <= Char["9n"]) {
-        // B, X and Y are encoded numbers
-        // CSI B ; X ; Y M
-        const numbers = [0, 0, 0];
-        let i = 2, j = 0;
-        for (; i < buffer.length; ++i) {
-          const char = buffer[i];
-          if (char === Char[";"]) {
-            ++j;
-            continue;
-          } else if (char === Char["M"]) {
-            break;
-          } else if (char < Char["0n"] || char > Char["9n"]) {
-            break mouse;
+      // Kitty | Mouse (URXVT, "\x1b[?1015h")
+      if (buffer[2] >= Char["1n"] && buffer[2] <= Char["9n"]) {
+        // TODO: move parsing numbers like this into its own function
+        mouse: {
+          // B, X and Y are encoded numbers
+          // CSI B ; X ; Y M
+          const numbers = [0, 0, 0];
+          let i = 2, j = 0;
+          for (; i < buffer.length; ++i) {
+            const char = buffer[i];
+            if (char === Char[";"]) {
+              ++j;
+              continue;
+            } else if (char === Char["M"]) {
+              break;
+            } else if (char < Char["0n"] || char > Char["9n"]) {
+              break mouse;
+            }
+
+            // Decode numbers
+            numbers[j] *= 10;
+            numbers[j] += char - Char["0n"];
           }
 
-          // Decode numbers
-          numbers[j] *= 10;
-          numbers[j] += char - Char["0n"];
+          // This encoding doesn't even support modifiers
+          const [encodedButton, x, y] = numbers;
+          return mousePress(x, y, mouseX10Modifiers(encodedButton));
         }
 
-        // This encoding doesn't even support modifiers
-        const [encodedButton, x, y] = numbers;
-        return mousePress(x, y, mouseX10Modifiers(encodedButton));
+        kitty: {
+          const numbers = [0, 0];
+          let i = 2, j = 0;
+          for (; i < buffer.length; ++i) {
+            const char = buffer[i];
+            if (char === Char[";"]) {
+              ++j;
+              continue;
+            } else if (char === Char["u"]) {
+              break;
+            } else if (char < Char["0n"] || char > Char["9n"]) {
+              break kitty;
+            }
+
+            // Decode numbers
+            numbers[j] *= 10;
+            numbers[j] += char - Char["0n"];
+          }
+
+          let [key, modifiers] = numbers;
+          modifiers -= 1;
+
+          const shift = !!(modifiers & 1);
+          const alt = !!(modifiers & 2);
+          const ctrl = !!(modifiers & 4);
+          // TODO: Right now hyper, meta and super keys are being merged together, what should be done with them?
+          const meta = !!(modifiers & (8 | 16 | 32));
+          // TODO: should capslock and numlock be added to the KeyPress?
+          const _caps_lock = !!(modifiers & 64);
+          const _num_lock = !!(modifiers & 128);
+
+          return maybeMultiple(keyPress(String.fromCharCode(key), shift, ctrl, meta, alt), buffer, i + 1);
+        }
       }
 
       // TODO: Mouse highlight tracking?
