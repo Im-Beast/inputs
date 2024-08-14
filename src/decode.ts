@@ -87,9 +87,11 @@ export interface MousePress extends KeyPress {
   key: "mouse";
 
   button?: MouseButton;
-  release?: boolean;
   scroll?: MouseScroll;
+
+  release: boolean;
   drag: boolean;
+  move: boolean;
 
   x: number;
   y: number;
@@ -100,7 +102,19 @@ function keyPress(key: string, shift = false, ctrl = false, meta = false, alt = 
 }
 
 function mousePress(x: number, y: number, other?: Partial<MousePress>): [MousePress] {
-  return [{ key: "mouse", x, y, shift: false, drag: false, ctrl: false, meta: false, alt: false, ...other }];
+  return [{
+    key: "mouse",
+    x,
+    y,
+    shift: false,
+    ctrl: false,
+    meta: false,
+    alt: false,
+    release: false,
+    drag: false,
+    move: false,
+    ...other,
+  }];
 }
 
 function maybeMultiple(keyPress: [KeyPress], buffer: Uint8Array, length: number) {
@@ -127,27 +141,26 @@ function modifierKeypress(key: string, modifiers: number): [KeyPress] {
  */
 function mouseX10Modifiers(encodedButton: number): Partial<MousePress> {
   // Low two bits encode button (or 3 – release)
+  // If scroll is used – button encodes its direction
   const button = encodedButton & 3;
 
   // Then modifiers are stored in the next 3 bits
   // We offset them by 2 bit places so they can be easily bitmasked
-  const modifiers = (encodedButton & 31) >> 2;
-  const ctrl = !!(modifiers & 4);
+  const modifiers = (encodedButton & 127) >> 2;
+  const shift = !!(modifiers & 1);
   // Technically meta, however most terminals decode it as an alt
   const alt = !!(modifiers & 2);
-  const shift = !!(modifiers & 1);
-
-  // Used with button-event and any-event tracking modes
-  const drag = !!(encodedButton & 32);
-
+  const ctrl = !!(modifiers & 4);
   // Release events aren't reported for the scroll
-  const scroll = !!(encodedButton & 64) && button !== 3;
+  const scroll = !!(modifiers & 8) && button !== 3;
+  // Used with button-event and any-event tracking modes
+  const drag = !!(modifiers & 16);
+
   // TODO: Buttons through 6 to 11?
 
-  // Drag & Release is enabled when Any-event tracking mode is enabled
-  // And user just moves their mouse
+  // Drag & Release is true when Any-event tracking mode is enabled and user just moves their mouse
   if (drag && button === 3) {
-    return { ctrl, alt, shift };
+    return { move: true, ctrl, alt, shift };
   } else if (scroll) {
     return { scroll: button, drag, ctrl, alt, shift };
   } else if (button === 3) {
