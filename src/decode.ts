@@ -257,15 +257,16 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
         const button = buffer[3] - 32;
 
         // UTF-8 Extended coordinates ("\x1b[?1005h")
-        // For positions less than 95, the resulting output is identical to X10
-        let x = -32, y = -32;
+        let x = 0, yOffset = 0;
         if (buffer[4] > Char["DEL"]) {
-          x += utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]) ?? buffer[4];
-          y += buffer[6] > Char["DEL"] ? utf8CodePointsToUtf16CodeUnit(buffer[6], buffer[7]) ?? buffer[6] : buffer[5];
-        } else {
-          x += buffer[4];
-          y += buffer[5] > Char["DEL"] ? utf8CodePointsToUtf16CodeUnit(buffer[5], buffer[6]) ?? buffer[5] : buffer[5];
+          const utf16codeUnit = utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]);
+          if (utf16codeUnit) {
+            x = utf16codeUnit - 32;
+            yOffset += 1;
+          }
         }
+        x ||= buffer[4] - 32;
+        const y = (utf8CodePointsToUtf16CodeUnit(buffer[5 + yOffset], buffer[6 + yOffset]) ?? buffer[5 + yOffset]) - 32;
 
         // Normal tracking mode ("\x1b[?1000h")
         // Button-event tracking ("\x1b[?1002h")
