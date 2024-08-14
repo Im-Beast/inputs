@@ -223,7 +223,7 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
       }
 
       // Mouse (URXVT, "\x1b[?1015h")
-      if (buffer[2] >= Char["1n"] && buffer[2] <= Char["9n"]) {
+      mouse: if (buffer[2] >= Char["1n"] && buffer[2] <= Char["9n"]) {
         // B, X and Y are encoded numbers
         // CSI B ; X ; Y M
         const numbers = [0, 0, 0];
@@ -235,6 +235,8 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
             continue;
           } else if (char === Char["M"]) {
             break;
+          } else if (char < Char["0n"] || char > Char["9n"]) {
+            break mouse;
           }
 
           // Decode numbers
