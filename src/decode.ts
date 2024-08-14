@@ -146,15 +146,15 @@ function mouseX10Modifiers(encodedButton: number): Partial<MousePress> {
 
   // Then modifiers are stored in the next 3 bits
   // We offset them by 2 bit places so they can be easily bitmasked
-  const modifiers = (encodedButton & 127) >> 2;
+  const modifiers = (encodedButton & 63) >> 2;
   const shift = !!(modifiers & 1);
   // Technically meta, however most terminals decode it as an alt
   const alt = !!(modifiers & 2);
   const ctrl = !!(modifiers & 4);
   // Release events aren't reported for the scroll
-  const scroll = !!(modifiers & 8) && button !== 3;
   // Used with button-event and any-event tracking modes
-  const drag = !!(modifiers & 16);
+  const drag = !!(encodedButton & 64);
+  const scroll = (encodedButton & 96) === 96 && button !== 3;
 
   // TODO: Buttons through 6 to 11?
 
