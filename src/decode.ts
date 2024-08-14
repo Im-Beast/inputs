@@ -388,8 +388,8 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
   //  - "\x1b" at the second last position signifies pressed alt.
   //  - "\x18@s" ast the start signifies pressed meta key.
   //  - Character is always encoded at the last position.
-  const alt = buffer.length > 1 && (buffer[0] === Char["ESC"] || buffer[3] == Char["ESC"]);
   const meta = buffer[0] === Char["CANCEL"] && buffer[1] === Char["@"] && buffer[2] === Char["s"];
+  const alt = buffer.length > 1 && (buffer[0] === Char["ESC"] || (meta && buffer[3] == Char["ESC"]));
   const startPos = (alt ? 1 : 0) + (meta ? 3 : 0);
   const charByte = buffer[startPos];
 
