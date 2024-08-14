@@ -1,16 +1,33 @@
 import { assertArrayIncludes, assertEquals } from "jsr:@std/assert";
-import { decodeBuffer, type KeyPress } from "../src/decode.ts";
+import { decodeBuffer, type KeyPress, type MousePress } from "../src/decode.ts";
 
 type ExpectedResult = [name: string, ansi: string, KeyPress];
 
+function mouse(modifiers: Partial<MousePress>): MousePress {
+  return {
+    key: "mouse",
+    x: 0,
+    y: 0,
+    shift: false,
+    ctrl: false,
+    meta: false,
+    alt: false,
+    release: false,
+    drag: false,
+    move: false,
+    ...modifiers,
+  };
+}
+
 function key(key: string, modifiers: Partial<KeyPress> = {}): KeyPress {
-  return Object.assign({
+  return {
     key,
     alt: false,
     ctrl: false,
     meta: false,
     shift: false,
-  }, modifiers);
+    ...modifiers,
+  };
 }
 
 function modifierTests(
@@ -193,24 +210,90 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ["„", "„", key("„", { shift: false })],
   ["Family", "👪", key("👪")],
   ["Dog", "🐕", key("🐕")],
-  // TODO: Mouse tests
+
+  // Mouse
+  ...Array.from({ length: (232 / 32) ** 2 }, (_, i) => {
+    const x = ((i * 32) + 1) % 232;
+    const y = Math.floor((i / (232 / 32)) + 1) % 232;
+
+    const utfX = i % 2015;
+    const utfY = Math.floor(i / 2015);
+
+    const en = (x: number) => String.fromCharCode(x + 32);
+
+    const modifiers: [number, string, Partial<MousePress>][] = [
+      [4, "Shift", { shift: true }],
+      [8, "Alt", { alt: true }],
+      [16, "Control", { ctrl: true }],
+      [12, "Alt + Shift", { alt: true, shift: true }],
+      [24, "Control + Alt", { ctrl: true, alt: true }],
+      [20, "Shift + Control", { shift: true, ctrl: true }],
+      [28, "Shift + Alt + Control", { shift: true, alt: true, ctrl: true }],
+    ];
+
+    // TODO: URXVT, SGR
+    const X10 = (x: number, y: number, suffix: string): ExpectedResult[][] =>
+      modifiers.map(([modifier, modifierName, modifierObj]) => [
+        [
+          `${modifierName} + Mouse move (${x}, ${y}) ${suffix}`,
+          `\x1b[M${en(modifier + 35) + en(x) + en(y)}`,
+          mouse({ x, y, move: true, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse left click (${x}, ${y}) ${suffix}`,
+          `\x1b[M${en(modifier + 0) + en(x) + en(y)}`,
+          mouse({ x, y, button: 0, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse middle click (${x}, ${y}) ${suffix}`,
+          `\x1b[M${en(modifier + 1) + en(x) + en(y)}`,
+          mouse({ x, y, button: 1, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse right click (${x}, ${y}) ${suffix}`,
+          `\x1b[M${en(modifier + 2) + en(x) + en(y)}`,
+          mouse({ x, y, button: 2, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse release click (${x}, ${y}) ${suffix}`,
+          `\x1b[M${en(modifier + 3) + en(x) + en(y)}`,
+          mouse({ x, y, release: true, ...modifierObj }),
+        ],
+
+        [
+          `${modifierName} + Mouse scroll up (${x}, ${y}) ${suffix}`,
+          `\x1b[M${en(modifier + 64) + en(x) + en(y)}`,
+          mouse({ x, y, scroll: 0, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse scroll down (${x}, ${y}) ${suffix}`,
+          `\x1b[M${en(modifier + 65) + en(x) + en(y)}`,
+          mouse({ x, y, scroll: 1, ...modifierObj }),
+        ],
+      ]);
+
+    const rules: ExpectedResult[] = [
+      ...X10(x, y, "X10 (ASCII)"),
+      ...X10(utfX, utfY, "X10 (UTF)"),
+    ].flat();
+
+    return rules;
+  }).flat(),
 ];
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-Deno.test("decodeBuffer() – 1 input", async (t) => {
+Deno.test("decodeBuffer() – 1 input", () => {
   for (const [name, ansi, keyPress] of EXPECTED_RESULTS) {
-    await t.step(name, () => {
-      const ansiBuffer = textEncoder.encode(ansi);
-      const escaped = Deno.inspect(textDecoder.decode(ansiBuffer));
+    const ansiBuffer = textEncoder.encode(ansi);
+    const escaped = Deno.inspect(textDecoder.decode(ansiBuffer));
 
-      assertEquals(decodeBuffer(ansiBuffer), [keyPress], escaped);
-    });
+    assertEquals(decodeBuffer(ansiBuffer), [keyPress], `${name}: ${escaped}`);
   }
 });
 
-Deno.test("decodeBuffer() – 2 inputs at once", async (t) => {
+Deno.test("decodeBuffer() – 2 inputs at once", () => {
   const POSSIBLE_MULTIPLE = EXPECTED_RESULTS.filter((result) => {
     // Escape key cannot be sent together with other keys
     // Possibly to avoid mixing it with legacy modifier encoding
@@ -224,18 +307,13 @@ Deno.test("decodeBuffer() – 2 inputs at once", async (t) => {
       const [nameB, ansiB, keyPressB] = POSSIBLE_MULTIPLE[(i + j) % POSSIBLE_MULTIPLE.length];
       const expectedResult = [keyPressA, keyPressB];
 
-      await t.step(`"${nameA}" + "${nameB}"`, async (t) => {
-        const permutations = [ansiA + ansiB, ansiB + ansiA];
+      const permutations = [[ansiA + ansiB, `"${nameA}" + "${nameB}"`], [ansiB + ansiA, `"${nameB}" + "${nameA}"`]];
 
-        for (const ansi of permutations) {
-          await t.step(Deno.inspect(ansi), () => {
-            const ansiBuffer = textEncoder.encode(ansi);
-            const escaped = Deno.inspect(textDecoder.decode(ansiBuffer));
-
-            assertArrayIncludes(decodeBuffer(ansiBuffer) as KeyPress[], expectedResult, escaped);
-          });
-        }
-      });
+      for (const [ansi, name] of permutations) {
+        const ansiBuffer = textEncoder.encode(ansi);
+        const escaped = Deno.inspect(textDecoder.decode(ansiBuffer));
+        assertArrayIncludes(decodeBuffer(ansiBuffer) as KeyPress[], expectedResult, `${name}: ${escaped}`);
+      }
     }
   }
 });
