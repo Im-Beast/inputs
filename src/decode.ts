@@ -257,16 +257,21 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
         const button = buffer[3] - 32;
 
         // UTF-8 Extended coordinates ("\x1b[?1005h")
-        let x = 0, yOffset = 0;
-        if (buffer[4] > Char["DEL"]) {
-          const utf16codeUnit = utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]);
-          if (utf16codeUnit) {
-            x = utf16codeUnit - 32;
-            yOffset += 1;
-          }
+        let i = 5, charUnit: number | undefined;
+        let x = 0, y = 0;
+        if (buffer[4] > Char["DEL"] && (charUnit = utf8CodePointsToUtf16CodeUnit(buffer[4], buffer[5]))) {
+          x = charUnit - 32;
+          ++i;
+        } else {
+          x = buffer[4] - 32;
         }
-        x ||= buffer[4] - 32;
-        const y = (utf8CodePointsToUtf16CodeUnit(buffer[5 + yOffset], buffer[6 + yOffset]) ?? buffer[5 + yOffset]) - 32;
+
+        if (buffer[i] > Char["DEL"] && (charUnit = utf8CodePointsToUtf16CodeUnit(buffer[i], buffer[i + 1]))) {
+          y = charUnit - 32;
+          ++i;
+        } else {
+          y = buffer[i] - 32;
+        }
 
         // Normal tracking mode ("\x1b[?1000h")
         // Button-event tracking ("\x1b[?1002h")
@@ -274,7 +279,7 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
         // CSI M B X Y
         if (button > MouseButton.Right) {
           const encodedButton = buffer[3];
-          return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, 6);
+          return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, i + 1);
         }
 
         return mousePress(x, y, { button });
