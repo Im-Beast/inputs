@@ -162,7 +162,7 @@ function mouseX10Modifiers(encodedButton: number): Partial<MousePress> {
   if (drag && button === 3) {
     return { move: true, ctrl, alt, shift };
   } else if (scroll) {
-    return { scroll: button, drag, ctrl, alt, shift };
+    return { scroll: button, ctrl, alt, shift };
   } else if (button === 3) {
     return { release: true, drag, ctrl, alt, shift };
   } else {
