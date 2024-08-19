@@ -37,5 +37,5 @@ export function decodeURXVTMouse(buffer: Uint8Array): [MousePress, ...KeyPress[]
 
     // This encoding doesn't even support modifiers
     const [encodedButton, x, y] = numbers;
-    return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, i + 1);
+    return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, i);
 }
