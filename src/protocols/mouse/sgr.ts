@@ -33,5 +33,5 @@ export function decodeSGRMouse(buffer: Uint8Array): [MousePress, ...KeyPress[]] 
     const [encodedButton, x, y] = numbers;
     const modifiers = mouseX10Modifiers(encodedButton);
     modifiers.release ||= buffer[i] === Char["m"];
-    return maybeMultiple(mousePress(x, y, modifiers), buffer, i + 1);
+    return maybeMultiple(mousePress(x, y, modifiers), buffer, i);
 }
