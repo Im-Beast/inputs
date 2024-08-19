@@ -1,12 +1,10 @@
 import { Char } from "../../chars.ts";
 import { decodeBuffer, KeyPress, keyPress, maybeMultiple } from "../../decode.ts";
 
-// FIXME: Change wording from "meta" to "super" so its obvious what's being conveyed
-
 const textDecoder = new TextDecoder();
 
 /**
- * Keyboard XTERM UTF-8 Keys
+ * Keyboard XTerm UTF-8 Keys
  *
  * @example
  * `a`
@@ -154,7 +152,6 @@ export function decodeXTermSS3FunctionKeys(buffer: Uint8Array): [KeyPress, ...Ke
  */
 export function decodeXTermCSIFunctionKeys(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
     // TODO: Don't precalculate?
-    // F1..=F4
 
     // Home | End | Arrows
     if (
@@ -202,6 +199,7 @@ export function decodeXTermCSIFunctionKeys(buffer: Uint8Array): [KeyPress, ...Ke
         return maybeMultiple(keyPress(key), buffer, 4);
     }
 
+    // F1..=F4
     let fKey = buffer[5] - Char["O"];
     if (fKey > 0 && fKey < 5) {
         return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[4]), buffer, 6);

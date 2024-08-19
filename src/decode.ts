@@ -9,6 +9,7 @@ import { decodeSGRMouse } from "./protocols/mouse/sgr.ts";
 import { decodeURXVTMouse } from "./protocols/mouse/urxvt.ts";
 import { decodeX10Mouse } from "./protocols/mouse/x10.ts";
 
+// FIXME: Change wording from "meta" to "super" so its obvious what's being conveyed
 export interface KeyPress {
   key: string;
 
@@ -85,28 +86,28 @@ export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
   //
   // Length check here is just a fast dismiss
   if (buffer.length > 2 && buffer[0] === Char["ESC"]) {
-    // Mouse | Insert | Delete | PageUp | PageDown | Home | End | Arrows | F1..=F12 (CSI prefix)
+    // CSI prefix
     if (buffer[1] === Char["["]) {
-      // Mouse (SGR, "\x1b[?1006h")
       if (buffer[2] === Char["<"]) {
         return decodeSGRMouse(buffer);
       }
 
-      // Kitty | Mouse (URXVT, "\x1b[?1015h")
+      if (buffer[2] === Char["M"]) {
+        return decodeX10Mouse(buffer);
+      }
+
       // TODO: This is a very vague condition
       if (buffer[2] >= Char["1n"] && buffer[2] <= Char["9n"]) {
         const decoded = decodeKittyKey(buffer) ?? decodeURXVTMouse(buffer);
-        if (decoded) return decoded;
-      }
-
-      // Mouse (X10, "\x1b[?9h")
-      if (buffer[2] === Char["M"]) {
-        return decodeX10Mouse(buffer);
+        if (decoded) {
+          return decoded;
+        }
       }
 
       return decodeXTermCSIFunctionKeys(buffer);
     }
 
+    // SS3 prefix
     if (buffer[1] === Char["O"]) {
       return decodeXTermSS3FunctionKeys(buffer);
     }
