@@ -231,7 +231,6 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
       [28, "Shift + Alt + Control", { shift: true, alt: true, ctrl: true }],
     ];
 
-    // TODO: URXVT, SGR
     const X10 = (x: number, y: number, suffix: string): ExpectedResult[][] =>
       modifiers.map(([modifier, modifierName, modifierObj]) => [
         [
@@ -272,9 +271,91 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
         ],
       ]);
 
+    const SGR = (x: number, y: number, suffix: string): ExpectedResult[][] =>
+      modifiers.map(([modifier, modifierName, modifierObj]) => [
+        [
+          `${modifierName} + Mouse move (${x}, ${y}) ${suffix}`,
+          `\x1b[<${modifier + 35};${x};${y}M`,
+          mouse({ x, y, move: true, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse left click (${x}, ${y}) ${suffix}`,
+          `\x1b[<${modifier + 0};${x};${y}M`,
+          mouse({ x, y, button: 0, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse middle click (${x}, ${y}) ${suffix}`,
+          `\x1b[<${modifier + 1};${x};${y}M`,
+          mouse({ x, y, button: 1, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse right click (${x}, ${y}) ${suffix}`,
+          `\x1b[<${modifier + 2};${x};${y}M`,
+          mouse({ x, y, button: 2, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse release click (${x}, ${y}) ${suffix}`,
+          `\x1b[<${modifier};${x};${y}m`,
+          mouse({ x, y, button: 0, release: true, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse scroll up (${x}, ${y}) ${suffix}`,
+          `\x1b[<${modifier + 64};${x};${y}M`,
+          mouse({ x, y, scroll: 0, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse scroll down (${x}, ${y}) ${suffix}`,
+          `\x1b[<${modifier + 65};${x};${y}M`,
+          mouse({ x, y, scroll: 1, ...modifierObj }),
+        ],
+      ]);
+
+    const URXVT = (x: number, y: number, suffix: string): ExpectedResult[][] =>
+      modifiers.map(([modifier, modifierName, modifierObj]) => [
+        [
+          `${modifierName} + Mouse move (${x}, ${y}) ${suffix}`,
+          `\x1b[${modifier + 32 + 35};${x};${y}M`,
+          mouse({ x, y, move: true, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse left click (${x}, ${y}) ${suffix}`,
+          `\x1b[${modifier + 32 + 0};${x};${y}M`,
+          mouse({ x, y, button: 0, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse middle click (${x}, ${y}) ${suffix}`,
+          `\x1b[${modifier + 32 + 1};${x};${y}M`,
+          mouse({ x, y, button: 1, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse right click (${x}, ${y}) ${suffix}`,
+          `\x1b[${modifier + 32 + 2};${x};${y}M`,
+          mouse({ x, y, button: 2, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse release click (${x}, ${y}) ${suffix}`,
+          `\x1b[${modifier + 32 + 3};${x};${y}M`,
+          mouse({ x, y, release: true, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse scroll up (${x}, ${y}) ${suffix}`,
+          `\x1b[${modifier + 32 + 64};${x};${y}M`,
+          mouse({ x, y, scroll: 0, ...modifierObj }),
+        ],
+        [
+          `${modifierName} + Mouse scroll down (${x}, ${y}) ${suffix}`,
+          `\x1b[${modifier + 32 + 65};${x};${y}M`,
+          mouse({ x, y, scroll: 1, ...modifierObj }),
+        ],
+      ]);
+
     const rules: ExpectedResult[] = [
       ...X10(x, y, "X10 (ASCII)"),
       ...X10(utfX, utfY, "X10 (UTF)"),
+      ...SGR(x, y, "SGR"),
+      ...SGR(utfX, utfY, "SGR"),
+      ...URXVT(x, y, "URXVT"),
+      ...URXVT(utfX, utfY, "URXVT"),
     ].flat();
 
     return rules;
