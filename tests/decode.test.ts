@@ -168,6 +168,8 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ["ArrowLeft", "\x1b[D", key("left")],
   ...modifierTests("CSI", "ArrowLeft", "\x1b[1D", "left", {}, true),
 
+  ["Shift + Tab", "\x1b[Z", key("tab", { shift: true })],
+
   // Other special keys
   ...modifierTests("CSI", "Insert", "\x1b[2~", "insert"),
   ...modifierTests("CSI", "Delete", "\x1b[3~", "delete"),

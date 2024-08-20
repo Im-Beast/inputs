@@ -155,8 +155,8 @@ export function decodeXTermCSIFunctionKeys(buffer: Uint8Array): [KeyPress, ...Ke
 
     // Home | End | Arrows
     if (
-        (buffer[2] >= Char["A"] && buffer[2] <= Char["H"]) ||
-        (buffer[3] === Char[";"] && buffer[5] >= Char["A"] && buffer[5] <= Char["H"])
+        (buffer[2] === Char["Z"]|| (buffer[2] >= Char["A"] && buffer[2] <= Char["H"])) ||
+        (buffer[3] === Char[";"] && (buffer[5] >= Char["A"] && buffer[5] <= Char["H"]))
     ) {
         let key = "unknown <1>";
 
@@ -172,6 +172,8 @@ export function decodeXTermCSIFunctionKeys(buffer: Uint8Array): [KeyPress, ...Ke
 
           case Char["F"]: key = "end"; break;
           case Char["H"]: key = "home"; break;
+
+          case Char["Z"]: return maybeMultiple(keyPress("tab", true), buffer, 3);
         }
 
         if (hasModifiers) return maybeMultiple(modifierKeypress(key, buffer[4]), buffer, 6);
