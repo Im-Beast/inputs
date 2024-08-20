@@ -14,35 +14,35 @@ const textDecoder = new TextDecoder();
  * `\x18@s\x1bą`
  */
 export function decodeXTermUtf8Key(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
-    // Legacy modifier encoding:
-    //  - "\x1b" at the second last position signifies pressed alt.
-    //  - "\x18@s" ast the start signifies pressed meta key.
-    //  - Character is always encoded at the last position.
-    const meta = buffer[0] === Char["CANCEL"] && buffer[1] === Char["@"] && buffer[2] === Char["s"];
-    const alt = (meta && buffer[3] == Char["ESC"]) || (buffer.length > 1 && buffer[0] === Char["ESC"]);
-    const startPos = (alt ? 1 : 0) + (meta ? 3 : 0);
-    const charByte = buffer[startPos];
+  // Legacy modifier encoding:
+  //  - "\x1b" at the second last position signifies pressed alt.
+  //  - "\x18@s" ast the start signifies pressed meta key.
+  //  - Character is always encoded at the last position.
+  const meta = buffer[0] === Char["CANCEL"] && buffer[1] === Char["@"] && buffer[2] === Char["s"];
+  const alt = (meta && buffer[3] == Char["ESC"]) || (buffer.length > 1 && buffer[0] === Char["ESC"]);
+  const startPos = (alt ? 1 : 0) + (meta ? 3 : 0);
+  const charByte = buffer[startPos];
 
-    // "!"..="@" | "["..="~"
-    if (
-        (charByte >= Char["!"] && charByte <= Char["@"]) ||
-        (charByte >= Char["["] && charByte <= Char["~"])
-    ) {
-        const character = String.fromCharCode(charByte);
-        return maybeMultiple(keyPress(character, false, false, meta, alt), buffer, startPos + 1);
-    }
+  // "!"..="@" | "["..="~"
+  if (
+    (charByte >= Char["!"] && charByte <= Char["@"]) ||
+    (charByte >= Char["["] && charByte <= Char["~"])
+  ) {
+    const character = String.fromCharCode(charByte);
+    return maybeMultiple(keyPress(character, false, false, meta, alt), buffer, startPos + 1);
+  }
 
-    // "A"..="Z"
-    if (charByte >= Char["A"] && charByte <= Char["Z"]) {
-        const character = String.fromCharCode(charByte);
-        return maybeMultiple(keyPress(character, true, false, meta, alt), buffer, startPos + 1);
-    }
+  // "A"..="Z"
+  if (charByte >= Char["A"] && charByte <= Char["Z"]) {
+    const character = String.fromCharCode(charByte);
+    return maybeMultiple(keyPress(character, true, false, meta, alt), buffer, startPos + 1);
+  }
 
-    let key = "unknown <4>";
-    let ctrl = false;
+  let key = "unknown <4>";
+  let ctrl = false;
 
-    // deno-fmt-ignore
-    switch (charByte) {
+  // deno-fmt-ignore
+  switch (charByte) {
     // "\x00"
     case Char["NULL"]:
       ctrl = true;
@@ -101,7 +101,7 @@ export function decodeXTermUtf8Key(buffer: Uint8Array): [KeyPress, ...KeyPress[]
       }
   }
 
-    return maybeMultiple(keyPress(key, false, ctrl, meta, alt), buffer, startPos + 1);
+  return maybeMultiple(keyPress(key, false, ctrl, meta, alt), buffer, startPos + 1);
 }
 
 /**
@@ -110,12 +110,12 @@ export function decodeXTermUtf8Key(buffer: Uint8Array): [KeyPress, ...KeyPress[]
  * We also offset it by 1 (thus -49, not -48) to be able to bitmask it easily.
  */
 function modifierKeypress(key: string, modifiers: number): [KeyPress] {
-    modifiers -= Char["0n"] + 1;
-    const meta = modifiers === 0;
-    const shift = !!(modifiers & 1);
-    const alt = !!(modifiers & 2);
-    const ctrl = !!(modifiers & 4);
-    return keyPress(key, shift, ctrl, meta, alt);
+  modifiers -= Char["0n"] + 1;
+  const meta = modifiers === 0;
+  const shift = !!(modifiers & 1);
+  const alt = !!(modifiers & 2);
+  const ctrl = !!(modifiers & 4);
+  return keyPress(key, shift, ctrl, meta, alt);
 }
 
 /**
@@ -126,21 +126,21 @@ function modifierKeypress(key: string, modifiers: number): [KeyPress] {
  * ESC O ...
  */
 export function decodeXTermSS3FunctionKeys(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
-    // Shift + Return | F1..=F4 (SS3 prefix)
-    // Shift + Return produces this code for some reason
-    if (buffer[2] === Char["M"]) {
-        return maybeMultiple(keyPress("return", true), buffer, 3);
-    }
+  // Shift + Return | F1..=F4 (SS3 prefix)
+  // Shift + Return produces this code for some reason
+  if (buffer[2] === Char["M"]) {
+    return maybeMultiple(keyPress("return", true), buffer, 3);
+  }
 
-    // If F key is encoded at the third position
-    // then it has no modifiers
-    if (buffer[2] > Char["O"]) {
-        const fKey = buffer[2] - Char["O"];
-        return maybeMultiple(keyPress(`f${fKey}`), buffer, 3);
-    }
+  // If F key is encoded at the third position
+  // then it has no modifiers
+  if (buffer[2] > Char["O"]) {
+    const fKey = buffer[2] - Char["O"];
+    return maybeMultiple(keyPress(`f${fKey}`), buffer, 3);
+  }
 
-    const fKey = buffer[3] - Char["O"];
-    return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[2]), buffer, 4);
+  const fKey = buffer[3] - Char["O"];
+  return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[2]), buffer, 4);
 }
 
 /**
@@ -151,20 +151,20 @@ export function decodeXTermSS3FunctionKeys(buffer: Uint8Array): [KeyPress, ...Ke
  * CSI ...
  */
 export function decodeXTermCSIFunctionKeys(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
-    // TODO: Don't precalculate?
+  // TODO: Don't precalculate?
 
-    // Home | End | Arrows
-    if (
-        (buffer[2] === Char["Z"]|| (buffer[2] >= Char["A"] && buffer[2] <= Char["H"])) ||
-        (buffer[3] === Char[";"] && (buffer[5] >= Char["A"] && buffer[5] <= Char["H"]))
-    ) {
-        let key = "unknown <1>";
+  // Home | End | Arrows
+  if (
+    (buffer[2] === Char["Z"] || (buffer[2] >= Char["A"] && buffer[2] <= Char["H"])) ||
+    (buffer[3] === Char[";"] && (buffer[5] >= Char["A"] && buffer[5] <= Char["H"]))
+  ) {
+    let key = "unknown <1>";
 
-        // If fourth character is a semicolon (";") then it has encoded modifiers
-        const hasModifiers = buffer[3] === Char[";"];
+    // If fourth character is a semicolon (";") then it has encoded modifiers
+    const hasModifiers = buffer[3] === Char[";"];
 
-        // deno-fmt-ignore
-        switch (buffer[hasModifiers ? 5 : 2]) {
+    // deno-fmt-ignore
+    switch (buffer[hasModifiers ? 5 : 2]) {
           case Char["A"]: key = "up"; break;
           case Char["B"]: key = "down"; break;
           case Char["C"]: key = "right"; break;
@@ -176,17 +176,17 @@ export function decodeXTermCSIFunctionKeys(buffer: Uint8Array): [KeyPress, ...Ke
           case Char["Z"]: return maybeMultiple(keyPress("tab", true), buffer, 3);
         }
 
-        if (hasModifiers) return maybeMultiple(modifierKeypress(key, buffer[4]), buffer, 6);
-        return maybeMultiple(keyPress(key), buffer, 3);
-    }
+    if (hasModifiers) return maybeMultiple(modifierKeypress(key, buffer[4]), buffer, 6);
+    return maybeMultiple(keyPress(key), buffer, 3);
+  }
 
-    // Insert | Delete | PageUp | PageDown
-    // F5..=F12 as well as some other CSI encoded special keys end with tilde ("~")
-    if (buffer[3] === Char["~"] || (buffer[3] == Char[";"] && buffer[5] === Char["~"])) {
-        let key = "unknown <2>";
+  // Insert | Delete | PageUp | PageDown
+  // F5..=F12 as well as some other CSI encoded special keys end with tilde ("~")
+  if (buffer[3] === Char["~"] || (buffer[3] == Char[";"] && buffer[5] === Char["~"])) {
+    let key = "unknown <2>";
 
-        // deno-fmt-ignore
-        switch (buffer[2]) {
+    // deno-fmt-ignore
+    switch (buffer[2]) {
           case Char["2n"]: key = "insert"; break;
           case Char["3n"]: key = "delete"; break;
 
@@ -194,41 +194,41 @@ export function decodeXTermCSIFunctionKeys(buffer: Uint8Array): [KeyPress, ...Ke
           case Char["6n"]: key = "pagedown"; break;
         }
 
-        // If 4th character is a semicolon (";"), then it encodes modifiers
-        if (buffer[3] === Char[";"]) {
-            return maybeMultiple(modifierKeypress(key, buffer[4]), buffer, 6);
-        }
-        return maybeMultiple(keyPress(key), buffer, 4);
+    // If 4th character is a semicolon (";"), then it encodes modifiers
+    if (buffer[3] === Char[";"]) {
+      return maybeMultiple(modifierKeypress(key, buffer[4]), buffer, 6);
     }
+    return maybeMultiple(keyPress(key), buffer, 4);
+  }
 
-    // F1..=F4
-    let fKey = buffer[5] - Char["O"];
-    if (fKey > 0 && fKey < 5) {
-        return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[4]), buffer, 6);
-    }
+  // F1..=F4
+  let fKey = buffer[5] - Char["O"];
+  if (fKey > 0 && fKey < 5) {
+    return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[4]), buffer, 6);
+  }
 
-    // Whoever designed this is a maniac?
-    // F5  – CSI 1 5 ~
-    // F6  – CSI 1 7 ~ <- ???
-    // F7  – CSI 1 8 ~
-    // F8  – CSI 1 9 ~
-    // F9  – CSI 2 0 ~
-    // F10 - CSI 2 1 ~
-    // F11 - CSI 2 3 ~ <- ???
-    // F12 - CSI 2 4 ~
-    if (buffer[2] === Char["1n"]) {
-        fKey = buffer[3] - Char["0n"];
-        if (fKey > 5) fKey--;
-    } else {
-        // We are starting from 0 and its F9, so we add 9
-        fKey = buffer[3] - Char["0n"] + 9;
-        if (fKey > 10) fKey--;
-    }
+  // Whoever designed this is a maniac?
+  // F5  – CSI 1 5 ~
+  // F6  – CSI 1 7 ~ <- ???
+  // F7  – CSI 1 8 ~
+  // F8  – CSI 1 9 ~
+  // F9  – CSI 2 0 ~
+  // F10 - CSI 2 1 ~
+  // F11 - CSI 2 3 ~ <- ???
+  // F12 - CSI 2 4 ~
+  if (buffer[2] === Char["1n"]) {
+    fKey = buffer[3] - Char["0n"];
+    if (fKey > 5) fKey--;
+  } else {
+    // We are starting from 0 and its F9, so we add 9
+    fKey = buffer[3] - Char["0n"] + 9;
+    if (fKey > 10) fKey--;
+  }
 
-    // If 5th character is a semicolon (";"), then it encodes modifiers
-    if (buffer[4] === Char[";"]) {
-        return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[5]), buffer, 7);
-    }
+  // If 5th character is a semicolon (";"), then it encodes modifiers
+  if (buffer[4] === Char[";"]) {
+    return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[5]), buffer, 7);
+  }
 
-    return maybeMultiple(keyPress(`f${fKey}`), buffer, 5);
+  return maybeMultiple(keyPress(`f${fKey}`), buffer, 5);
 }

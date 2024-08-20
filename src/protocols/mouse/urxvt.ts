@@ -16,26 +16,26 @@ import { mouseX10Modifiers } from "./x10.ts";
  * `\x1b[2;69;420M`
  */
 export function decodeURXVTMouse(buffer: Uint8Array): [MousePress, ...KeyPress[]] | undefined {
-    // TODO: move parsing numbers like this into its own function
-    const numbers = [0, 0, 0];
-    let i = 2, j = 0;
-    while (i < buffer.length) {
-        const char = buffer[i++];
-        if (char === Char["M"]) {
-            break;
-        } else if (char === Char[";"]) {
-            ++j;
-            continue;
-        } else if (char < Char["0n"] || char > Char["9n"]) {
-            return;
-        }
-
-        // Decode numbers
-        numbers[j] *= 10;
-        numbers[j] += char - Char["0n"];
+  // TODO: move parsing numbers like this into its own function
+  const numbers = [0, 0, 0];
+  let i = 2, j = 0;
+  while (i < buffer.length) {
+    const char = buffer[i++];
+    if (char === Char["M"]) {
+      break;
+    } else if (char === Char[";"]) {
+      ++j;
+      continue;
+    } else if (char < Char["0n"] || char > Char["9n"]) {
+      return;
     }
 
-    // This encoding doesn't even support modifiers
-    const [encodedButton, x, y] = numbers;
-    return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, i);
+    // Decode numbers
+    numbers[j] *= 10;
+    numbers[j] += char - Char["0n"];
+  }
+
+  // This encoding doesn't even support modifiers
+  const [encodedButton, x, y] = numbers;
+  return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, i);
 }
