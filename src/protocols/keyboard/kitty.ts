@@ -1,5 +1,7 @@
+import { type KeyEvent, keyEvent } from "./shared.ts";
+
 import { Char } from "../../chars.ts";
-import { KeyPress, keyPress, maybeMultiple } from "../../decode.ts";
+import { maybeMultiple } from "../../decode.ts";
 
 /**
  * Keyboard kitty – "\x1b[>1u"
@@ -12,7 +14,7 @@ import { KeyPress, keyPress, maybeMultiple } from "../../decode.ts";
  * @example
  * `\x1b[111;5u`
  */
-export function decodeKittyKey(buffer: Uint8Array): [KeyPress, ...KeyPress[]] | undefined {
+export function decodeKittyKey(buffer: Uint8Array): [KeyEvent, ...KeyEvent[]] | undefined {
   const numbers = [0, 0];
   let i = 2, j = 0;
   while (i < buffer.length) {
@@ -40,8 +42,12 @@ export function decodeKittyKey(buffer: Uint8Array): [KeyPress, ...KeyPress[]] | 
   // TODO: Right now hyper, meta and super keys are being merged together, what should be done with them?
   const meta = !!(modifiers & (8 | 16 | 32));
   // TODO: should capslock and numlock be added to the KeyPress?
-  const _caps_lock = !!(modifiers & 64);
-  const _num_lock = !!(modifiers & 128);
+  // const capsLock = !!(modifiers & 64);
+  // const numLock = !!(modifiers & 128);
 
-  return maybeMultiple(keyPress(String.fromCharCode(key), shift, ctrl, meta, alt), buffer, i + 1);
+  return maybeMultiple(
+    keyEvent(String.fromCharCode(key), { shift, alt, ctrl, meta }),
+    buffer,
+    i + 1,
+  );
 }

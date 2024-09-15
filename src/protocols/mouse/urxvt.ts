@@ -1,5 +1,8 @@
+import type { KeyEvent } from "../keyboard/shared.ts";
+import { type MouseEvent, mouseEvent } from "./shared.ts";
+
 import { Char } from "../../chars.ts";
-import { KeyPress, maybeMultiple, MousePress, mousePress } from "../../decode.ts";
+import { maybeMultiple } from "../../decode.ts";
 import { mouseX10Modifiers } from "./x10.ts";
 
 /**
@@ -15,7 +18,7 @@ import { mouseX10Modifiers } from "./x10.ts";
  * @example
  * `\x1b[2;69;420M`
  */
-export function decodeURXVTMouse(buffer: Uint8Array): [MousePress, ...KeyPress[]] | undefined {
+export function decodeURXVTMouse(buffer: Uint8Array): [MouseEvent, ...KeyEvent[]] | undefined {
   // TODO: move parsing numbers like this into its own function
   const numbers = [0, 0, 0];
   let i = 2, j = 0;
@@ -37,5 +40,5 @@ export function decodeURXVTMouse(buffer: Uint8Array): [MousePress, ...KeyPress[]
 
   // This encoding doesn't even support modifiers
   const [encodedButton, x, y] = numbers;
-  return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, i);
+  return maybeMultiple(mouseEvent(x, y, mouseX10Modifiers(encodedButton)), buffer, i);
 }

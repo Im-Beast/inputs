@@ -1,10 +1,13 @@
+import type { KeyEvent } from "../keyboard/shared.ts";
+import { MouseButton, type MouseEvent, mouseEvent } from "./shared.ts";
+
 import { Char } from "../../chars.ts";
-import { type KeyPress, maybeMultiple, MouseButton, type MousePress, mousePress } from "../../decode.ts";
+import { maybeMultiple } from "../../decode.ts";
 
 /**
  * Returns calculated mouse X10 modifiers
  */
-export function mouseX10Modifiers(encodedButton: number): Partial<MousePress> {
+export function mouseX10Modifiers(encodedButton: number): Partial<MouseEvent> {
   // Low two bits encode button (or 3 – release)
   // If scroll is used – button encodes its direction
   const button = encodedButton & 3;
@@ -65,7 +68,7 @@ function utf8CodePointsToUtf16CodeUnit(a: number, b: number): number | undefined
  * @example
  * `\x1b[M @@`
  */
-export function decodeX10Mouse(buffer: Uint8Array): [MousePress, ...KeyPress[]] {
+export function decodeX10Mouse(buffer: Uint8Array): [MouseEvent, ...KeyEvent[]] {
   // X10 Compatibility mode ("\x1b[?9h")
   const button = buffer[3] - 32;
 
@@ -91,8 +94,8 @@ export function decodeX10Mouse(buffer: Uint8Array): [MousePress, ...KeyPress[]] 
   // Any-event tracking ("\x1b[?1003h")
   if (button > MouseButton.Right) {
     const encodedButton = buffer[3];
-    return maybeMultiple(mousePress(x, y, mouseX10Modifiers(encodedButton)), buffer, i + 1);
+    return maybeMultiple(mouseEvent(x, y, mouseX10Modifiers(encodedButton)), buffer, i + 1);
   }
 
-  return mousePress(x, y, { button });
+  return mouseEvent(x, y, { button });
 }

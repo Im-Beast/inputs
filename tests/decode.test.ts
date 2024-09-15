@@ -1,9 +1,15 @@
 import { assertArrayIncludes, assertEquals } from "jsr:@std/assert";
-import { decodeBuffer, type KeyPress, type MousePress } from "../src/decode.ts";
+import {
+  decodeBuffer,
+  type KeyEvent,
+  type KeyEventModifiers,
+  type MouseEvent,
+  type MouseEventModifiers,
+} from "../mod.ts";
 
-type ExpectedResult = [name: string, ansi: string, KeyPress];
+type ExpectedResult = [name: string, ansi: string, KeyEvent];
 
-function mouse(modifiers: Partial<MousePress>): MousePress {
+function mouse(modifiers: Partial<MouseEventModifiers>): MouseEvent {
   return {
     key: "mouse",
     x: 0,
@@ -19,7 +25,7 @@ function mouse(modifiers: Partial<MousePress>): MousePress {
   };
 }
 
-function key(key: string, modifiers: Partial<KeyPress> = {}): KeyPress {
+function key(key: string, modifiers: Partial<KeyEventModifiers> = {}): KeyEvent {
   return {
     key,
     alt: false,
@@ -35,7 +41,7 @@ function modifierTests(
   name: string,
   baseAnsi: string,
   expectedKey: string,
-  override: Partial<KeyPress> = {},
+  override: Partial<KeyEvent> = {},
   skipDefault = false,
 ): ExpectedResult[] {
   if (type === "Legacy") {
@@ -223,7 +229,7 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
 
     const en = (x: number) => String.fromCharCode(x + 32);
 
-    const modifiers: [number, string, Partial<MousePress>][] = [
+    const modifiers: [number, string, Partial<MouseEvent>][] = [
       [4, "Shift", { shift: true }],
       [8, "Alt", { alt: true }],
       [16, "Control", { ctrl: true }],
@@ -395,7 +401,7 @@ Deno.test("decodeBuffer() – 2 inputs at once", () => {
       for (const [ansi, name] of permutations) {
         const ansiBuffer = textEncoder.encode(ansi);
         const escaped = Deno.inspect(textDecoder.decode(ansiBuffer));
-        assertArrayIncludes(decodeBuffer(ansiBuffer) as KeyPress[], expectedResult, `${name}: ${escaped}`);
+        assertArrayIncludes(decodeBuffer(ansiBuffer) as KeyEvent[], expectedResult, `${name}: ${escaped}`);
       }
     }
   }

@@ -1,5 +1,8 @@
+import type { KeyEvent } from "../keyboard/shared.ts";
+import { type MouseEvent, mouseEvent } from "./shared.ts";
+
 import { Char } from "../../chars.ts";
-import { KeyPress, maybeMultiple, MousePress, mousePress } from "../../decode.ts";
+import { maybeMultiple } from "../../decode.ts";
 import { mouseX10Modifiers } from "./x10.ts";
 
 /**
@@ -13,7 +16,7 @@ import { mouseX10Modifiers } from "./x10.ts";
  * @example
  * `\x1b[<2;69;420M`
  */
-export function decodeSGRMouse(buffer: Uint8Array): [MousePress, ...KeyPress[]] {
+export function decodeSGRMouse(buffer: Uint8Array): [MouseEvent, ...KeyEvent[]] {
   const numbers = [0, 0, 0];
   let i = 3, j = 0;
   while (i < buffer.length) {
@@ -33,5 +36,5 @@ export function decodeSGRMouse(buffer: Uint8Array): [MousePress, ...KeyPress[]] 
   const [encodedButton, x, y] = numbers;
   const modifiers = mouseX10Modifiers(encodedButton + 32);
   modifiers.release = buffer[i - 1] === Char["m"];
-  return maybeMultiple(mousePress(x, y, modifiers), buffer, i);
+  return maybeMultiple(mouseEvent(x, y, modifiers), buffer, i);
 }

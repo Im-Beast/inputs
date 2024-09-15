@@ -1,3 +1,4 @@
+import type { KeyEvent } from "./protocols/keyboard/shared.ts";
 import { Char } from "./chars.ts";
 import { decodeKittyKey } from "./protocols/keyboard/kitty.ts";
 import {
@@ -9,67 +10,11 @@ import { decodeSGRMouse } from "./protocols/mouse/sgr.ts";
 import { decodeURXVTMouse } from "./protocols/mouse/urxvt.ts";
 import { decodeX10Mouse } from "./protocols/mouse/x10.ts";
 
-// FIXME: Change wording from "meta" to "super" so its obvious what's being conveyed
-export interface KeyPress {
-  key: string;
-
-  shift: boolean;
-  meta: boolean;
-  ctrl: boolean;
-  alt: boolean;
-}
-
-export const enum MouseButton {
-  Left = 0,
-  Middle,
-  Right,
-}
-
-export const enum MouseScroll {
-  Up,
-  Down,
-}
-
-// TODO: Maybe it should be split into multiple interfaces, TBD
-export interface MousePress extends KeyPress {
-  key: "mouse";
-
-  button?: MouseButton;
-  scroll?: MouseScroll;
-
-  release: boolean;
-  drag: boolean;
-  move: boolean;
-
-  x: number;
-  y: number;
-}
-
-export function keyPress(key: string, shift = false, ctrl = false, meta = false, alt = false): [KeyPress] {
-  return [{ key, shift, ctrl, meta, alt }];
-}
-
-export function mousePress(x: number, y: number, other?: Partial<MousePress>): [MousePress] {
-  return [{
-    key: "mouse",
-    x,
-    y,
-    shift: false,
-    ctrl: false,
-    meta: false,
-    alt: false,
-    release: false,
-    drag: false,
-    move: false,
-    ...other,
-  }];
-}
-
-export function maybeMultiple<T extends KeyPress>(
-  keyPress: [T, ...KeyPress[]],
+export function maybeMultiple<T extends KeyEvent>(
+  keyPress: [T, ...KeyEvent[]],
   buffer: Uint8Array,
   length: number,
-): [T, ...KeyPress[]] {
+): [T, ...KeyEvent[]] {
   if (buffer.length > length) keyPress.push(...decodeBuffer(buffer.slice(length)));
   return keyPress;
 }
@@ -78,7 +23,7 @@ export function maybeMultiple<T extends KeyPress>(
  * A lot of information has been taken from @link {https://invisible-island.net/xterm/ctlseqs/ctlseqs.txt}.\
  * I cannot be more thankful to the authors of this document ❤️.
  */
-export function decodeBuffer(buffer: Uint8Array): [KeyPress, ...KeyPress[]] {
+export function decodeBuffer(buffer: Uint8Array): [KeyEvent, ...KeyEvent[]] {
   // TODO: Support glueing together cut buffers (mostly windows mouse issue)
 
   // We start by checking keys that always start with "\x1b"
