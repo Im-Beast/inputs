@@ -18,25 +18,28 @@ import { mouseX10Modifiers } from "./x10.ts";
  * @example
  * `\x1b[2;69;420M`
  */
-export function decodeURXVTMouse(buffer: Uint8Array): [MouseEvent, ...KeyEvent[]] | undefined {
+export function decodeURXVTMouse(buffer: Uint8Array): null | [MouseEvent, ...KeyEvent[]] {
   // TODO: move parsing numbers like this into its own function
   const numbers = [0, 0, 0];
-  let i = 2, j = 0;
+  let i = 2, j = 0, complete = false;
   while (i < buffer.length) {
     const char = buffer[i++];
     if (char === Char["M"]) {
+      complete = true;
       break;
     } else if (char === Char[";"]) {
       ++j;
       continue;
     } else if (char < Char["0n"] || char > Char["9n"]) {
-      return;
+      return null;
     }
 
     // Decode numbers
     numbers[j] *= 10;
     numbers[j] += char - Char["0n"];
   }
+
+  if (!complete) return null;
 
   // This encoding doesn't even support modifiers
   const [encodedButton, x, y] = numbers;

@@ -16,16 +16,23 @@ import { mouseX10Modifiers } from "./x10.ts";
  * @example
  * `\x1b[<2;69;420M`
  */
-export function decodeSGRMouse(buffer: Uint8Array): [MouseEvent, ...KeyEvent[]] {
+export function decodeSGRMouse(buffer: Uint8Array): null | [MouseEvent, ...KeyEvent[]] {
+  let release: boolean | undefined;
   const numbers = [0, 0, 0];
   let i = 3, j = 0;
-  while (i < buffer.length) {
+  loop: while (i < buffer.length) {
     const char = buffer[i++];
-    if (char === Char["m"] || char === Char["M"]) {
-      break;
-    } else if (char === Char[";"]) {
-      ++j;
-      continue;
+
+    switch (char) {
+      case Char["m"]:
+        release = true;
+        break loop;
+      case Char["M"]:
+        release = false;
+        break loop;
+      case Char[";"]:
+        ++j;
+        continue;
     }
 
     // Decode numbers
@@ -33,8 +40,14 @@ export function decodeSGRMouse(buffer: Uint8Array): [MouseEvent, ...KeyEvent[]] 
     numbers[j] += char - Char["0n"];
   }
 
+  // Invalid or incomplete SGR sequence, missing ending
+  if (typeof release === "undefined") {
+    return null;
+  }
+
   const [encodedButton, x, y] = numbers;
+
   const modifiers = mouseX10Modifiers(encodedButton + 32);
-  modifiers.release = buffer[i - 1] === Char["m"];
+  modifiers.release = release;
   return maybeMultiple(mouseEvent(x, y, modifiers), buffer, i);
 }

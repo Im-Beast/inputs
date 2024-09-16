@@ -68,7 +68,7 @@ function utf8CodePointsToUtf16CodeUnit(a: number, b: number): number | undefined
  * @example
  * `\x1b[M @@`
  */
-export function decodeX10Mouse(buffer: Uint8Array): [MouseEvent, ...KeyEvent[]] {
+export function decodeX10Mouse(buffer: Uint8Array): null | [MouseEvent, ...KeyEvent[]] {
   // X10 Compatibility mode ("\x1b[?9h")
   const button = buffer[3] - 32;
 
@@ -80,6 +80,11 @@ export function decodeX10Mouse(buffer: Uint8Array): [MouseEvent, ...KeyEvent[]] 
     ++i;
   } else {
     x = buffer[4] - 32;
+  }
+
+  // Invalid or incomplete sequence, missing y position
+  if (!buffer[i]) {
+    return null;
   }
 
   if (buffer[i] > Char["DEL"] && (charUnit = utf8CodePointsToUtf16CodeUnit(buffer[i], buffer[i + 1]))) {

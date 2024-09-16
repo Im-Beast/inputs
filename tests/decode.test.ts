@@ -6,6 +6,7 @@ import {
   type MouseEvent,
   type MouseEventModifiers,
 } from "../mod.ts";
+import { getRemnant } from "../src/decode.ts";
 
 type ExpectedResult = [name: string, ansi: string, KeyEvent];
 
@@ -406,3 +407,33 @@ Deno.test("decodeBuffer() – 2 inputs at once", () => {
     }
   }
 });
+
+// It is important to remember that some split chunks can create actually
+// parsable buffers, so not all chunk sizes would pass this test.
+//
+// Tests check chunk sizes of 3 and above to eliminate some of the ambigious events.
+const longestAnsiLength = EXPECTED_RESULTS.reduce((p, n) => Math.max(p, n[1].length), 0);
+for (let chunkSize = 3; chunkSize < longestAnsiLength; ++chunkSize) {
+  Deno.test(`decodeBuffer() – 1 input, split buffer into chunks of ${chunkSize} chars`, () => {
+    for (const [name, ansi, keyPress] of EXPECTED_RESULTS) {
+      const ansiBuffer = Array.from(textEncoder.encode(ansi));
+      const splitBuffers: Uint8Array[] = [];
+      while (ansiBuffer.length) {
+        splitBuffers.push(new Uint8Array(ansiBuffer.splice(0, chunkSize)));
+      }
+
+      const escaped = Deno.inspect([splitBuffers, splitBuffers.map((x) => new TextDecoder().decode(x))]);
+
+      let decoded: KeyEvent[] | undefined;
+      for (const buffer of splitBuffers) {
+        const events = decodeBuffer(buffer);
+        if (events.length) {
+          decoded = events;
+        }
+      }
+
+      assertEquals(getRemnant(), undefined);
+      assertEquals(decoded, [keyPress], `${name}: ${escaped}`);
+    }
+  });
+}

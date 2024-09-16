@@ -14,18 +14,19 @@ import { maybeMultiple } from "../../decode.ts";
  * @example
  * `\x1b[111;5u`
  */
-export function decodeKittyKey(buffer: Uint8Array): [KeyEvent, ...KeyEvent[]] | undefined {
+export function decodeKittyKey(buffer: Uint8Array): null | [KeyEvent, ...KeyEvent[]] {
   const numbers = [0, 0];
-  let i = 2, j = 0;
+  let i = 2, j = 0, complete = false;
   while (i < buffer.length) {
     const char = buffer[i++];
     if (char === Char["u"]) {
+      complete = true;
       break;
     } else if (char === Char[";"]) {
       ++j;
       continue;
     } else if (char < Char["0n"] || char > Char["9n"]) {
-      return;
+      return null;
     }
 
     // Decode numbers
@@ -33,7 +34,12 @@ export function decodeKittyKey(buffer: Uint8Array): [KeyEvent, ...KeyEvent[]] | 
     numbers[j] += char - Char["0n"];
   }
 
+  if (!complete) {
+    return null;
+  }
+
   let [key, modifiers] = numbers;
+
   modifiers -= 1;
 
   const shift = !!(modifiers & 1);
