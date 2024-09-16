@@ -13,7 +13,7 @@ export async function* decodeStdout() {
     ]);
 
     const decoded = decodeBuffer(chunk);
-    if (decoded[0].key === "c" && decoded[0].ctrl) break;
+    if (decoded?.[0]?.key === "c" && decoded[0].ctrl) break;
 
     yield decoded;
   }
