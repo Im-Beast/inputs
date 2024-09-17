@@ -157,7 +157,7 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ...modifierTests("Legacy", "Space", " ", "space"),
   ["Ctrl + Space", "\x00", key("space", { ctrl: true })],
   ...modifierTests("Legacy", "Tab", "\t", "tab"),
-  // FIXME: ["Shift + Tab", "\x1b[Z", key("tab", { shift: true })],
+  ["Shift + Tab", "\x1b[Z", key("tab", { shift: true })],
 
   ["Return", "\r", key("return")],
   ["Shift + Return", "\x1bOM", key("return", { shift: true })],
