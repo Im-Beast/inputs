@@ -57,7 +57,6 @@ export function decodeXTermUtf8Key(buffer: Uint8Array): null | [KeyEvent, ...Key
     case Char["SPACE"]: key = "space"; break;
     // "\n"
     //
-    // FIXME: It might not be the case in tmux
     // Ctrl+J is normally used to send NL/LF (same as Ctrl+I or Return).
     // However instead of sending "\r" it sends "\n".
     // This behavior seems to be followed by every major terminal.
