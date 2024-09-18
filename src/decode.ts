@@ -1,14 +1,14 @@
-import type { KeyEvent } from "./protocols/keyboard/shared.ts";
+import type { KeyEvent } from "./encodings/keyboard/shared.ts";
 import { Char } from "./chars.ts";
-import { decodeKittyKey } from "./protocols/keyboard/kitty.ts";
+import { decodeKittyKey } from "./encodings/keyboard/kitty.ts";
 import {
   decodeXTermCSIFunctionKeys,
   decodeXTermSS3FunctionKeys,
   decodeXTermUtf8Key,
-} from "./protocols/keyboard/xterm.ts";
-import { decodeSGRMouse } from "./protocols/mouse/sgr.ts";
-import { decodeURXVTMouse } from "./protocols/mouse/urxvt.ts";
-import { decodeX10Mouse } from "./protocols/mouse/x10.ts";
+} from "./encodings/keyboard/xterm.ts";
+import { decodeSGRMouse } from "./encodings/mouse/sgr.ts";
+import { decodeURXVTMouse } from "./encodings/mouse/urxvt.ts";
+import { decodeX10Mouse } from "./encodings/mouse/x10.ts";
 
 let remnantBuffer: Uint8Array | undefined;
 
