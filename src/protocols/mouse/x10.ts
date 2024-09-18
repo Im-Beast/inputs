@@ -49,8 +49,6 @@ function utf8CodePointsToUtf16CodeUnit(a: number, b: number): number | undefined
   }
 }
 
-// TODO: Mouse highlight tracking?
-
 /**
  * Mouse X10 – "\x1b[?9h"
  *
