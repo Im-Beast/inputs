@@ -23,13 +23,13 @@ Package to decode ANSI sequences from stdin.
           <td align="center" title="Around 80% complete, doesn't support one type of sequences and lacks tests">🟧</td>
         </tr>
         <tr>
-          <td align="center" rowspan="8">Mouse</td>
+          <td align="center" rowspan="5">Mouse</td>
           <th>Encoding</th>
           <th>Mode</th>
           <th>Status</th>
         </tr>
         <tr>
-          <td rowspan="5">
+          <td rowspan="4">
             X10 (<code>CSI ? 9 h</code>/<code>CSI ? 1000 h</code>) <br />
             UTF-8 (<code>CSI ? 1005 h </code>) <br />
             SGR (<code>CSI ? 1006 h</code>) <br />
