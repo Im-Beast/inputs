@@ -7,6 +7,7 @@ import { mouseX10Modifiers } from "./x10.ts";
 
 /**
  * Mouse SGR – "\x1b[?1006h"
+ * Mouse SGR-Pixels – "\x1b[?1016h"
  *
  * Caller has to make sure that first three chars of buffer are ["\x1b", "[", "<"].
  *
