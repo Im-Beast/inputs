@@ -215,12 +215,24 @@ export function decodeXTermCSIFunctionKeys(buffer: Uint8Array): null | [KeyEvent
     return maybeMultiple(keyEvent(key), buffer, 4);
   }
 
-  // To decode F1..=F12 we need at least 6 characters in the buffer
+  // F1..=F4 (without modifiers)
+  // e.g. "\x1b[P"
+  if (buffer[3] !== Char[";"]) {
+    const fKey = buffer[2] - Char["O"];
+    if (fKey > 0 && fKey < 5) {
+      return maybeMultiple(keyEvent(`f${fKey}`), buffer, 3);
+    }
+  }
+
+  // To decode F1..=F12 key events later on
+  // we need at least 6 characters in the buffer
+  // otherwise its either invalid or incomplete sequence
   if (buffer.length < 5) {
     return null;
   }
 
-  // F1..=F4
+  // F1..=F4 (with modifiers)
+  // e.g. "\x1b[1;1P"
   let fKey = buffer[5] - Char["O"];
   if (fKey > 0 && fKey < 5) {
     return maybeMultiple(modifierKeypress(`f${fKey}`, buffer[4]), buffer, 6);

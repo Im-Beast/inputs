@@ -116,7 +116,6 @@ function modifierTests(
   return rules;
 }
 
-//  TODO: emojis and stuff
 const EXPECTED_RESULTS: ExpectedResult[] = [
   // Alphabet
   ...Array.from({ length: 26 }, (_, i) => {
@@ -192,6 +191,7 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ...Array.from({ length: 4 }, (_, i) => {
     const n = i + 1;
     const rules: ExpectedResult[] = [
+      [`F${n} (CSI, without modifiers)`, `\x1b[${String.fromCharCode(80 + i)}`, key(`f${n}`)],
       ...modifierTests("CSI", `F${n}`, `\x1b[1${n}~`, `f${n}`),
       ...modifierTests("CSI", `F${n}`, `\x1b[1${String.fromCharCode(80 + i)}`, `f${n}`, {}, true),
       ...modifierTests("SS3", `F${n}`, `\x1bO${String.fromCharCode(80 + i)}`, `f${n}`),
@@ -219,6 +219,8 @@ const EXPECTED_RESULTS: ExpectedResult[] = [
   ["„", "„", key("„", { shift: false })],
   ["Family", "👪", key("👪")],
   ["Dog", "🐕", key("🐕")],
+
+  // TODO: Tests for Kitty protocol
 
   // Mouse
   ...Array.from({ length: (232 / 32) ** 2 }, (_, i) => {
