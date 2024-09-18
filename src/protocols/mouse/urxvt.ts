@@ -6,7 +6,7 @@ import { maybeMultiple } from "../../decode.ts";
 import { mouseX10Modifiers } from "./x10.ts";
 
 /**
- * Mouse URXVT – "\x1b[?10015h"
+ * Mouse URXVT – "\x1b[?1015h"
  *
  * Caller has to make sure that first two chars of buffer are ["\x1b", "["].
  * Even with above guarantees decoding buffer might still fail, as CSI <num> is also
