@@ -122,7 +122,7 @@ export function decodeXTermUtf8Key(buffer: Uint8Array): null | [KeyEvent, ...Key
  */
 function modifierKeypress(key: string, modifiers: number): [KeyEvent] {
   modifiers -= Char["0n"] + 1;
-  const meta = modifiers === 0;
+  const meta = modifiers === 0 || !!(modifiers & 8);
   const shift = !!(modifiers & 1);
   const alt = !!(modifiers & 2);
   const ctrl = !!(modifiers & 4);
@@ -164,6 +164,10 @@ export function decodeXTermSS3FunctionKeys(buffer: Uint8Array): null | [KeyEvent
  * CSI ...
  */
 export function decodeXTermCSIFunctionKeys(buffer: Uint8Array): null | [KeyEvent, ...KeyEvent[]] {
+  // FIXME: Terminals which support kitty protocol use 8 as a bit for the meta key.
+  //        This can cause some keys to return null when multiple modifier keys are pressed
+  //        since they take 2 characters (e.g. 8 | 4 -> 12) instead of just one.
+
   // Home | End | Shift+Tab | Arrows
   if (
     (buffer[2] === Char["Z"] || (buffer[2] >= Char["A"] && buffer[2] <= Char["H"])) ||

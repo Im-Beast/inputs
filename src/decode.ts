@@ -42,7 +42,12 @@ export function maybeMultiple<T extends KeyEvent>(
  */
 export function decodeBuffer(buffer: Uint8Array): KeyEvent[] {
   if (remnantBuffer) {
-    buffer = new Uint8Array([...remnantBuffer, ...buffer]);
+    if (remnantBuffer.length > 100) {
+      console.log("Cleared");
+      remnantBuffer = undefined;
+    } else {
+      buffer = new Uint8Array([...remnantBuffer, ...buffer]);
+    }
   }
 
   // We start by checking keys that always start with "\x1b"
@@ -72,8 +77,8 @@ export function decodeBuffer(buffer: Uint8Array): KeyEvent[] {
           decoded = decodeURXVTMouse(buffer);
         }
         // Shortest kitty sequence is
-        // "\x1b[1;1u" (6 chars)
-        if (!decoded && buffer.length > 6) {
+        // "\x1b[9u" (4 chars)
+        if (!decoded && buffer.length > 3) {
           decoded = decodeKittyKey(buffer);
         }
 
